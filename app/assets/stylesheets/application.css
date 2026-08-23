@@ -371,6 +371,9 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
   .converter__grid { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; }
   .chart-wrap { height: 240px; }
+  .topbar__inner { gap: 10px; }
+  .brand { font-size: 15px; gap: 8px; }
+  .nav { margin-left: 0; gap: 2px; }
   .nav__link { padding: 6px 8px; }
   .page-title { font-size: 18px; }
   .seg { flex-wrap: wrap; }
