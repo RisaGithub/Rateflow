@@ -1,5 +1,89 @@
 <% content_for :title, "Источники — Rateflow" %>
+
 <div>
   <h1 class="page-title">Источники данных</h1>
   <p class="page-sub">Состояние провайдеров и журнал обращений</p>
 </div>
+
+<section class="section">
+  <div class="section__head">
+    <%= render "shared/icon", name: "source" %>
+    <h2 class="section__title">Провайдеры</h2>
+  </div>
+  <div class="providers">
+    <% @providers.each do |p| %>
+      <div class="card provider">
+        <div class="provider__head">
+          <div>
+            <h3 class="provider__name"><%= p.name %> <span class="panel__label">· <%= p.role %></span></h3>
+            <div class="provider__url"><%= p.url %></div>
+          </div>
+          <% case p.state
+             when :ok %><span class="pill pill--ok">Работает</span>
+          <% when :fail %><span class="pill pill--fail">Недоступен</span>
+          <% else %><span class="pill pill--muted">Нет данных</span>
+          <% end %>
+        </div>
+        <div class="stats">
+          <div>
+            <div class="stat__label">Успешных</div>
+            <div class="stat__value"><%= p.success_rate ? "#{p.success_rate}%" : "—" %></div>
+          </div>
+          <div>
+            <div class="stat__label">Среднее время</div>
+            <div class="stat__value"><%= p.avg_duration_ms ? "#{p.avg_duration_ms} мс" : "—" %></div>
+          </div>
+          <div>
+            <div class="stat__label">Последняя попытка</div>
+            <div class="stat__value" style="font-size:13px;margin-top:6px"><%= p.last ? l(p.last.created_at, format: :short_ru) : "—" %></div>
+          </div>
+        </div>
+        <div class="bar" title="Доля успешных из последних <%= p.attempts %> попыток">
+          <div class="bar__fill" style="width: <%= p.success_rate.to_i %>%"></div>
+        </div>
+        <div class="panel__note">Статистика по последним <%= p.attempts %> попыткам</div>
+      </div>
+    <% end %>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section__head">
+    <%= render "shared/icon", name: "log" %>
+    <h2 class="section__title">Журнал обращений</h2>
+    <%= form_with url: sources_path, method: :get, class: "section__aside filters", data: { turbo_frame: "_top" } do |f| %>
+      <%= render "shared/icon", name: "filter", class: "is-flat" %>
+      <%= f.select :provider, options_for_select([["Все провайдеры", ""], ["ЦБ РФ", "cbr"], ["ER-API", "erapi"]], @provider),
+                   {}, class: "select", onchange: "this.form.requestSubmit()", "aria-label": "Провайдер" %>
+      <%= f.select :status, options_for_select([["Любой статус", ""], ["Успех", "ok"], ["Ошибка", "fail"]], @status),
+                   {}, class: "select", onchange: "this.form.requestSubmit()", "aria-label": "Статус" %>
+    <% end %>
+  </div>
+
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Время</th><th>Провайдер</th><th>Статус</th>
+          <th class="num">HTTP</th><th class="num">Время, мс</th><th class="num">Записей</th><th>Ошибка</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if @logs.empty? %>
+          <tr><td colspan="7" class="table-empty">Записей нет</td></tr>
+        <% end %>
+        <% @logs.each do |log| %>
+          <tr>
+            <td><%= l(log.created_at, format: :short_ru) %></td>
+            <td><%= provider_name(log.provider) %></td>
+            <td><span class="pill <%= log.ok? ? 'pill--ok' : 'pill--fail' %>"><%= log.ok? ? "Успех" : "Ошибка" %></span></td>
+            <td class="num muted"><%= log.http_status || "—" %></td>
+            <td class="num"><%= log.duration_ms %></td>
+            <td class="num"><%= log.records_count %></td>
+            <td class="wrap"><%= log.error_message.presence || "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>
