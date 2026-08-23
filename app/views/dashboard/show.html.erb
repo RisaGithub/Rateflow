@@ -18,11 +18,71 @@
     <div class="section__head">
       <%= render "shared/icon", name: "chart" %>
       <h2 class="section__title">График</h2>
+      <div class="section__aside controls">
+        <%= render "segment", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
+        <%= render "segment", key: "days", label: "Период", options: [[7, "7 дн"], [30, "30 дн"], [90, "90 дн"]] %>
+        <%= render "segment", key: "source", label: "Источник", options: [["cbr", "ЦБ РФ"], ["erapi", "ER-API"], ["both", "Оба"]] %>
+      </div>
     </div>
 
     <div class="card chart-card">
       <div class="chart-wrap"><canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas></div>
+      <div class="legend" data-dashboard-target="legend"></div>
       <div class="status-line" data-dashboard-target="status"></div>
+    </div>
+  </section>
+
+  <section class="duo">
+    <div class="section">
+      <div class="section__head">
+        <%= render "shared/icon", name: "convert" %>
+        <h2 class="section__title">Конвертер</h2>
+      </div>
+      <div class="card panel" data-controller="converter" data-converter-rates-value="<%= @dashboard.latest_rates.to_json %>">
+        <div class="converter__grid">
+          <div class="field">
+            <label for="conv-amount">Сумма</label>
+            <input id="conv-amount" class="input" type="number" inputmode="decimal" min="0" step="any" value="100"
+                   data-converter-target="amount" data-action="input->converter#calc">
+          </div>
+          <div class="field">
+            <label for="conv-currency">Валюта</label>
+            <select id="conv-currency" class="select" data-converter-target="currency" data-action="converter#calc">
+              <% Rate::CURRENCIES.each do |c| %><option value="<%= c %>"><%= c %></option><% end %>
+            </select>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control__label">Направление</span>
+          <div class="seg" role="group">
+            <button type="button" class="seg__btn" data-converter-target="dir" data-value="to_rub" data-action="converter#setDir" aria-pressed="true">В рубли</button>
+            <button type="button" class="seg__btn" data-converter-target="dir" data-value="from_rub" data-action="converter#setDir" aria-pressed="false">Из рублей</button>
+          </div>
+        </div>
+        <div>
+          <div class="panel__label">Результат</div>
+          <div class="panel__big" data-converter-target="result">—</div>
+          <div class="panel__note" data-converter-target="note"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "table" %>
+      <h2 class="section__title">История</h2>
+      <div class="section__aside controls">
+        <%= render "segment", key: "rows", label: "Строк", options: [[10, "10"], [30, "30"], [90, "90"]] %>
+      </div>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead>
+          <tr><th>Дата</th><th class="num">Курс, ₽</th><th class="num">Изменение</th><th class="num">%</th><th>Источник</th></tr>
+        </thead>
+        <tbody data-dashboard-target="tbody"></tbody>
+      </table>
     </div>
   </section>
 </div>

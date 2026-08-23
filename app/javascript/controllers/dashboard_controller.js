@@ -12,11 +12,11 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 // All series for the last 90 days are embedded in the page, so every switch
 // is a pure client-side re-render — no round trips.
 export default class extends Controller {
-  static targets = ["card", "canvas", "status"]
+  static targets = ["card", "seg", "canvas", "legend", "status", "tbody"]
   static values = { series: Object }
 
   connect() {
-    this.state = { currency: "USD", days: 30, source: "cbr" }
+    this.state = { currency: "USD", days: 30, source: "cbr", rows: 10 }
     this.onTheme = () => this.render()
     window.addEventListener("theme:change", this.onTheme)
     this.render()
@@ -31,6 +31,12 @@ export default class extends Controller {
 
   selectCurrency(event) {
     this.state.currency = event.currentTarget.dataset.currency
+    this.render()
+  }
+
+  setOption(event) {
+    const { key, value } = event.currentTarget.dataset
+    this.state[key] = key === "days" || key === "rows" ? Number(value) : value
     this.render()
   }
 
@@ -53,8 +59,43 @@ export default class extends Controller {
 
   render() {
     this.cardTargets.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.currency === this.state.currency)))
+    this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
     this.renderChart()
+    this.renderLegend()
     this.renderStatus()
+    this.renderTable()
+  }
+
+  renderLegend() {
+    const items = this.providers().map((p) =>
+      `<span class="legend__item"><span class="legend__swatch ${p === "erapi" ? "legend__swatch--alt" : ""}"></span>${PROVIDER_NAMES[p]}</span>`)
+    this.legendTarget.innerHTML = items.join("")
+  }
+
+  renderTable() {
+    // Day-over-day change is computed inside each provider's own series.
+    const rows = this.providers().flatMap((p) => {
+      const pts = this.points(p)
+      return pts.map(([d, v], i) => ({ d, v, p, delta: i > 0 ? v - pts[i - 1][1] : null, prev: i > 0 ? pts[i - 1][1] : null }))
+    })
+    rows.sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : a.p.localeCompare(b.p)))
+
+    const visible = rows.slice(0, this.state.rows)
+    if (!visible.length) {
+      this.tbodyTarget.innerHTML = `<tr><td colspan="5" class="table-empty">Нет данных за выбранный период</td></tr>`
+      return
+    }
+
+    const cls = (x) => (x == null || x === 0 ? "is-flat" : x > 0 ? "is-up" : "is-down")
+    const sign = (x, f) => (x > 0 ? "+" : x < 0 ? "−" : "") + f.format(Math.abs(x))
+    this.tbodyTarget.innerHTML = visible.map((r) => `
+      <tr>
+        <td>${dateRu(r.d)}</td>
+        <td class="num">${fmtRub.format(r.v)}</td>
+        <td class="num ${cls(r.delta)}">${r.delta == null ? "—" : sign(r.delta, fmtRub)}</td>
+        <td class="num ${cls(r.delta)}">${r.delta == null ? "—" : sign(r.delta / r.prev * 100, fmtPct) + "%"}</td>
+        <td class="muted">${PROVIDER_NAMES[r.p]}</td>
+      </tr>`).join("")
   }
 
   renderChart() {

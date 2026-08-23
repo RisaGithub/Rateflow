@@ -19,7 +19,12 @@ class Dashboard
   end
 
   def cards
-    Rate::CURRENCIES.map { |cur| card(cur) }
+    @cards ||= Rate::CURRENCIES.map { |cur| card(cur) }
+  end
+
+  # { "USD" => 82.92, ... } — the rate each card shows, used by the converter.
+  def latest_rates
+    cards.select(&:value).to_h { |c| [ c.code, c.value ] }
   end
 
   private

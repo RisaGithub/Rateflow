@@ -1,0 +1,10 @@
+<%# Segmented control bound to a dashboard state key. options: [[value, label], ...] %>
+<div class="control">
+  <span class="control__label"><%= label %></span>
+  <div class="seg" role="group" aria-label="<%= label %>">
+    <% options.each do |value, text| %>
+      <button type="button" class="seg__btn" data-dashboard-target="seg" data-key="<%= key %>" data-value="<%= value %>"
+              data-action="dashboard#setOption" aria-pressed="false"><%= text %></button>
+    <% end %>
+  </div>
+</div>
