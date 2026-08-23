@@ -1,4 +1,28 @@
-<div>
-  <h1 class="page-title">Курсы валют к рублю</h1>
-  <p class="page-sub">USD, EUR, CNY и GBP по данным ЦБ РФ с резервом из ER-API</p>
+<% content_for :head do %>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js" crossorigin="anonymous"></script>
+<% end %>
+
+<div data-controller="dashboard" data-dashboard-series-value="<%= @dashboard.series.to_json %>" class="page" style="padding:0">
+  <div>
+    <h1 class="page-title">Курсы валют к рублю</h1>
+    <p class="page-sub">USD, EUR, CNY и GBP по данным ЦБ РФ с резервом из ER-API</p>
+  </div>
+
+  <section class="cards" aria-label="Валюты">
+    <% @dashboard.cards.each do |card| %>
+      <%= render "card", card: card %>
+    <% end %>
+  </section>
+
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "chart" %>
+      <h2 class="section__title">График</h2>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-wrap"><canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas></div>
+      <div class="status-line" data-dashboard-target="status"></div>
+    </div>
+  </section>
 </div>
