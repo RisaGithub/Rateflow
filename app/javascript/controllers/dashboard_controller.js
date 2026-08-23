@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { forecast, backtest, nextDates, WINDOW, HORIZON } from "forecast"
 
 const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API" }
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
@@ -12,7 +13,7 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 // All series for the last 90 days are embedded in the page, so every switch
 // is a pure client-side re-render — no round trips.
 export default class extends Controller {
-  static targets = ["card", "seg", "canvas", "legend", "status", "tbody"]
+  static targets = ["card", "seg", "canvas", "legend", "status", "tbody", "trend"]
   static values = { series: Object }
 
   connect() {
@@ -55,6 +56,23 @@ export default class extends Controller {
     return this.state.source === "both" ? ["cbr", "erapi"] : [this.state.source]
   }
 
+  // Rolling-mean forecast for the primary visible provider, built on the full
+  // 90-day series (not just the visible window) so the backtest has more samples.
+  trend() {
+    const provider = this.providers()[0]
+    const all = this.seriesValue[this.state.currency]?.[provider] || []
+    if (all.length < WINDOW + 1) return null
+
+    const values = all.map(([, v]) => v)
+    const [from, last] = all.at(-1)
+    return {
+      provider, from, last,
+      dates: nextDates(from, HORIZON),
+      values: forecast(values),
+      backtest: backtest(values)
+    }
+  }
+
   // ----- render -----
 
   render() {
@@ -64,11 +82,42 @@ export default class extends Controller {
     this.renderLegend()
     this.renderStatus()
     this.renderTable()
+    this.renderTrend()
+  }
+
+  renderTrend() {
+    const t = this.trend()
+    if (!t) {
+      this.trendTarget.innerHTML = `<p class="panel__note">Недостаточно данных: для тренда нужно хотя бы ${WINDOW + 1} точек.</p>`
+      return
+    }
+    const end = t.values.at(-1)
+    const delta = end - t.last
+    const cls = delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat"
+    const sign = delta > 0 ? "+" : delta < 0 ? "−" : ""
+    const bt = t.backtest
+    this.trendTarget.innerHTML = `
+      <div class="panel__row">
+        <div>
+          <div class="panel__label">Ожидаемый курс через ${HORIZON} дн.</div>
+          <div class="panel__big">${fmtRub.format(end)} ₽</div>
+        </div>
+        <div>
+          <div class="panel__label">К последнему значению</div>
+          <div class="panel__value ${cls}">${sign}${fmtRub.format(Math.abs(delta))} ₽ · ${sign}${fmtPct.format(Math.abs(delta / t.last * 100))}%</div>
+        </div>
+      </div>
+      <p class="panel__note">
+        <b>Метод:</b> скользящее среднее за ${WINDOW} точек по данным ${PROVIDER_NAMES[t.provider]}, продолжение на ${HORIZON} дней (пунктир на графике).<br>
+        <b>Бэктест:</b> ${bt ? `средняя ошибка ${fmtRub.format(bt.mae)} ₽ (${fmtPct.format(bt.mape)}%) на ${bt.samples} исторических точках` : "недостаточно данных"}.<br>
+        Это статистическая экстраполяция, а не инвестиционная рекомендация.
+      </p>`
   }
 
   renderLegend() {
     const items = this.providers().map((p) =>
       `<span class="legend__item"><span class="legend__swatch ${p === "erapi" ? "legend__swatch--alt" : ""}"></span>${PROVIDER_NAMES[p]}</span>`)
+    if (this.trend()) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed"></span>Прогноз</span>`)
     this.legendTarget.innerHTML = items.join("")
   }
 
@@ -104,7 +153,9 @@ export default class extends Controller {
     const line = cssVar("--line")
     const provs = this.providers()
     const series = Object.fromEntries(provs.map((p) => [p, this.points(p)]))
-    const labels = [...new Set(provs.flatMap((p) => series[p].map(([d]) => d)))].sort()
+    const history = [...new Set(provs.flatMap((p) => series[p].map(([d]) => d)))].sort()
+    const trend = this.trend()
+    const labels = trend ? history.concat(trend.dates) : history
 
     const datasets = provs.map((p) => {
       const byDate = Object.fromEntries(series[p])
@@ -125,6 +176,27 @@ export default class extends Controller {
       }
     })
 
+    if (trend) {
+      // Dashed continuation: starts at the last actual point so the lines join.
+      const byDate = Object.fromEntries(trend.dates.map((d, i) => [d, trend.values[i]]))
+      byDate[trend.from] = trend.last
+      datasets.push({
+        label: "Прогноз",
+        data: labels.map((d) => byDate[d] ?? null),
+        borderColor: colors.cbr,
+        borderWidth: 2,
+        borderDash: [5, 4],
+        tension: 0.25,
+        spanGaps: false,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: colors.cbr,
+        pointHoverBorderColor: cssVar("--card"),
+        pointHoverBorderWidth: 2
+      })
+    }
+
     const data = { labels, datasets }
     const options = {
       responsive: true,
@@ -140,7 +212,7 @@ export default class extends Controller {
           borderColor: line,
           borderWidth: 1,
           padding: 10,
-          displayColors: provs.length > 1,
+          displayColors: provs.length > 1 || !!trend,
           titleFont: { family: "JetBrains Mono", size: 12 },
           bodyFont: { family: "JetBrains Mono", size: 12 },
           callbacks: {
