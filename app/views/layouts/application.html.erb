@@ -1,29 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
   <head>
+    <meta charset="utf-8">
     <title><%= content_for(:title) || "Rateflow" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Rateflow">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="Курсы валют к рублю: история, графики и журнал источников данных">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
-    <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong theme.
+      (function () { try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
+    </script>
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    <%= yield :head %>
   </head>
 
   <body>
-    <%= yield %>
+    <header class="topbar">
+      <div class="container topbar__inner">
+        <%= link_to root_path, class: "brand" do %>
+          <%= render "shared/icon", name: "logo" %>
+          <span>Rateflow</span>
+        <% end %>
+        <nav class="nav">
+          <%= link_to "Дашборд", root_path, class: "nav__link", "aria-current": (current_page?(root_path) ? "page" : nil) %>
+          <%= link_to "Источники", sources_path, class: "nav__link", "aria-current": (current_page?(sources_path) ? "page" : nil) %>
+        </nav>
+        <button type="button" class="theme-toggle" data-controller="theme" data-action="theme#toggle" aria-label="Переключить тему" title="Переключить тему">
+          <%= render "shared/icon", name: "sun", class: "theme-toggle__sun" %>
+          <%= render "shared/icon", name: "moon", class: "theme-toggle__moon" %>
+        </button>
+      </div>
+    </header>
+
+    <main class="container page">
+      <%= yield %>
+    </main>
+
+    <footer class="container footer">
+      <span>Rateflow · данные ЦБ РФ и open.er-api.com</span>
+      <span class="mono"><%= Date.current.strftime("%Y") %></span>
+    </footer>
   </body>
 </html>
