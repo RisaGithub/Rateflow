@@ -1,0 +1,18 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+development:
+  <<: *default
+  database: rateflow_development
+
+test:
+  <<: *default
+  database: rateflow_test
+
+# Production reads the full connection string from DATABASE_URL
+# (e.g. the Supabase connection URL set in Render's environment).
+production:
+  <<: *default
+  url: <%= ENV["DATABASE_URL"] %>
