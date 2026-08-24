@@ -37,6 +37,18 @@
             <div class="stat__label">Последняя попытка</div>
             <div class="stat__value" style="font-size:13px;margin-top:6px"><%= p.last ? l(p.last.created_at, format: :short_ru) : "—" %></div>
           </div>
+          <div>
+            <div class="stat__label">Данные с</div>
+            <div class="stat__value stat__value--sm"><%= p.coverage_from ? date_ru(p.coverage_from) : "—" %></div>
+          </div>
+          <div>
+            <div class="stat__label">Данные по</div>
+            <div class="stat__value stat__value--sm"><%= p.coverage_to ? date_ru(p.coverage_to) : "—" %></div>
+          </div>
+          <div>
+            <div class="stat__label">Точек</div>
+            <div class="stat__value stat__value--sm"><%= number_with_delimiter(p.points_count, delimiter: " ") %></div>
+          </div>
         </div>
         <div class="bar" title="Доля успешных из последних <%= p.attempts %> попыток">
           <div class="bar__fill" style="width: <%= p.success_rate.to_i %>%"></div>
@@ -85,5 +97,15 @@
         <% end %>
       </tbody>
     </table>
+  </div>
+
+  <div class="pager">
+    <% if @page > 1 %>
+      <%= link_to "← Новее", sources_path(provider: @provider, status: @status, page: @page - 1), class: "pager__link" %>
+    <% end %>
+    <span class="pager__info">Страница <%= @page %></span>
+    <% if @next_page %>
+      <%= link_to "Старше →", sources_path(provider: @provider, status: @status, page: @next_page), class: "pager__link" %>
+    <% end %>
   </div>
 </section>

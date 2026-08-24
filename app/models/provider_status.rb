@@ -21,6 +21,16 @@ class ProviderStatus
   def last = @recent.first
   def attempts = @recent.size
 
+  # Stored-data coverage: honestly shows why CBR reaches back to 1999 while
+  # the other two only cover recent months.
+  def coverage_from = coverage[0]
+  def coverage_to = coverage[1]
+  def points_count = coverage[2].to_i
+
+  private def coverage
+    @coverage ||= Rate.where(provider: key).pick(Arel.sql("MIN(on_date), MAX(on_date), COUNT(*)")) || []
+  end
+
   # :ok, :fail or :unknown (never called yet)
   def state
     return :unknown unless last
