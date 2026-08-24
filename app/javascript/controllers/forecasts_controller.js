@@ -30,10 +30,11 @@ const thinFromEnd = (items, max) => {
 // GET /forecasts/data; the browser only picks snapshots and draws them.
 export default class extends Controller {
   static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
-                    "mainLegend", "mainStatus", "fanCanvas", "fanStatus"]
+                    "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
+                    "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus"]
 
   connect() {
-    this.state = { currency: "USD", source: "both" }
+    this.state = { currency: "USD", source: "both", horizonDate: null }
     this.runIndex = null
     this.charts = {}
     this.facts = []
@@ -58,6 +59,11 @@ export default class extends Controller {
     this.state[key] = value
     this.resetPlayback()
     key === "currency" ? this.load() : this.render()
+  }
+
+  setHorizon(event) {
+    this.state.horizonDate = event.target.value
+    this.renderRevision()
   }
 
   // ----- data -----
@@ -183,6 +189,7 @@ export default class extends Controller {
     this.renderMainLegend()
     this.renderMainStatus()
     this.renderFan()
+    this.renderRevision()
   }
 
   // Block 1: the fact as a muted solid line, active snapshots dashed on top,
@@ -288,6 +295,106 @@ export default class extends Controller {
       `${SOURCE_NAMES[f.provider]}: ${f.shown.length === f.all.length ? f.all.length : `${f.shown.length} из ${f.all.length} (прорежено)`} снимков`)
     parts.push("свежие снимки ярче и толще")
     this.fanStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
+  }
+
+  // Block 3: how the forecast for one fixed date was revised, snapshot by
+  // snapshot. When the date has already come, the CBR fact runs as a flat
+  // line — did the revisions converge on the truth or walk away from it?
+  renderRevision() {
+    if (typeof Chart === "undefined") return
+
+    const dates = this.horizonDates()
+    this.syncHorizonSelect(dates)
+    const date = this.state.horizonDate
+    if (!date) {
+      this.charts.revision?.destroy()
+      delete this.charts.revision
+      this.revisionLegendTarget.innerHTML = ""
+      this.revisionStatusTarget.innerHTML = `<span>Нет дат, на которые есть хотя бы три снимка прогноза</span>`
+      return
+    }
+
+    // Per provider: [snapshot date, what it predicted for the chosen date].
+    const revisions = this.sources().flatMap((provider) => {
+      const points = this.runs(provider).flatMap((run) => {
+        const point = run.points.find(([d]) => d === date)
+        return point ? [[run.captured_at.slice(0, 10), point[1]]] : []
+      })
+      return points.length ? [{ provider, points }] : []
+    })
+
+    const labels = [...new Set(revisions.flatMap((r) => r.points.map(([d]) => d)))].sort()
+    const datasets = revisions.map((r) => {
+      const color = this.colorOf(r.provider)
+      const byDate = Object.fromEntries(r.points)
+      return {
+        label: FORECAST_NAMES[r.provider],
+        data: labels.map((d) => byDate[d] ?? null),
+        borderColor: color,
+        borderWidth: 2,
+        tension: 0.25,
+        spanGaps: true,
+        fill: false,
+        pointRadius: 2.5,
+        pointBackgroundColor: color,
+        pointBorderColor: color,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: color,
+        pointHoverBorderColor: cssVar("--card"),
+        pointHoverBorderWidth: 2
+      }
+    })
+
+    const fact = this.factFor(date)
+    if (fact != null) {
+      const factColor = cssVar("--text-3")
+      datasets.push({ label: "Факт ЦБ РФ", data: labels.map(() => fact), borderColor: factColor,
+                      borderWidth: 1.5, tension: 0, spanGaps: true, fill: false, pointRadius: 0, pointHoverRadius: 0 })
+    }
+
+    const options = this.baseOptions(labels)
+    options.plugins.tooltip.callbacks.title = (items) => `снимок от ${dateRu(items[0].label)}`
+    this.upsert("revision", this.revisionCanvasTarget, { labels, datasets }, options)
+
+    const items = revisions.map((r) => {
+      const cls = r.provider === "apecon" ? "legend__swatch--apecon" : ""
+      return `<span class="legend__item"><span class="legend__swatch ${cls}"></span>${FORECAST_NAMES[r.provider]} · ${r.points.length} снимков</span>`
+    })
+    if (fact != null) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>Факт ЦБ РФ</span>`)
+    this.revisionLegendTarget.innerHTML = items.join("")
+
+    const parts = [`по оси X — дата снимка, по оси Y — что тогда прогнозировали на ${dateRu(date)}`]
+    parts.push(fact != null ? `факт ЦБ РФ: ${fmtRub.format(fact)} ₽` : "дата ещё не наступила — факта пока нет")
+    this.revisionStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
+  }
+
+  // Horizon dates worth a revision chart: at least three snapshots of one
+  // provider predicted that exact date.
+  horizonDates() {
+    const qualified = new Set()
+    this.sources().forEach((provider) => {
+      const perDate = {}
+      this.runs(provider).forEach((run) => run.points.forEach(([d]) => { perDate[d] = (perDate[d] || 0) + 1 }))
+      Object.entries(perDate).forEach(([d, n]) => { if (n >= 3) qualified.add(d) })
+    })
+    return [...qualified].sort()
+  }
+
+  // Keeps the current choice when it survives the source/currency switch;
+  // otherwise defaults to the most recent already-matured date.
+  syncHorizonSelect(dates) {
+    if (!dates.includes(this.state.horizonDate)) {
+      const today = new Date().toISOString().slice(0, 10)
+      this.state.horizonDate = dates.filter((d) => d <= today).at(-1) || dates[0] || null
+    }
+    this.horizonSelectTarget.innerHTML = dates.map((d) =>
+      `<option value="${d}"${d === this.state.horizonDate ? " selected" : ""}>${dateRu(d)}</option>`).join("")
+    this.horizonSelectTarget.hidden = !dates.length
+  }
+
+  factFor(date) {
+    const hit = this.facts.find(([d]) => d === date)
+    return hit ? hit[1] : null
   }
 
   renderMainLegend() {

@@ -46,4 +46,23 @@
       <div class="status-line" data-forecasts-target="fanStatus"></div>
     </div>
   </section>
+
+  <%# The page's most telling block: not the forecast itself but how it was
+      revised — X is the snapshot date, Y is what was predicted back then for
+      one fixed horizon date. %>
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "convert" %>
+      <h2 class="section__title">Как менялся прогноз на дату</h2>
+      <div class="section__aside filters">
+        <label class="control__label" for="horizon-date">Дата</label>
+        <select id="horizon-date" class="select" data-forecasts-target="horizonSelect" data-action="forecasts#setHorizon"></select>
+      </div>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-wrap"><canvas data-forecasts-target="revisionCanvas" role="img" aria-label="История пересмотров прогноза на выбранную дату"></canvas></div>
+      <div class="legend" data-forecasts-target="revisionLegend"></div>
+      <div class="status-line" data-forecasts-target="revisionStatus"></div>
+    </div>
+  </section>
 </div>
