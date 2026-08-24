@@ -535,9 +535,14 @@ export default class extends Controller {
   renderMainLegend() {
     const items = [`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>ЦБ РФ (факт)</span>`]
     this.sources().forEach((p) => {
-      if (!this.activeRun(p)) return
+      const run = this.activeRun(p)
+      if (!run) return
       const cls = p === "apecon" ? "legend__swatch--apecon" : ""
       items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed ${cls}"></span>${FORECAST_NAMES[p]}</span>`)
+      // Same condition renderMain uses to draw the shaded min–max corridor.
+      if (run.points.filter((pt) => pt[2] != null && pt[3] != null).length > 1) {
+        items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--band ${cls}"></span>${FORECAST_NAMES[p]} · вилка мин–макс</span>`)
+      }
     })
     this.mainLegendTarget.innerHTML = items.join("")
   }

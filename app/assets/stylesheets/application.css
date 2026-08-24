@@ -329,6 +329,8 @@ svg.icon { flex: none; }
 .legend__swatch--alt2 { border-top-color: var(--text-2); }
 .legend__swatch--apecon { border-top-color: var(--accent-2); }
 .legend__swatch--dashed { border-top-style: dashed; }
+.legend__swatch--band { height: 8px; border-top-width: 0; border-radius: 2px; background: var(--accent); opacity: 0.18; }
+.legend__swatch--band.legend__swatch--apecon { background: var(--accent-2); }
 
 /* ---------- Two-column area: trend + converter ---------- */
 
