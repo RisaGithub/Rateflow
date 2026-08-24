@@ -7,6 +7,7 @@
   <% if card.value %>
     <div class="ccard__spark <%= trend_class(card.delta) %>"><%= sparkline(card.spark) %></div>
     <div class="ccard__value num"><%= rub(card.value, precision: 2) %><small>₽</small></div>
+    <div class="ccard__src"><%= provider_name(card.provider) %> · <%= date_ru(card.on_date) %></div>
     <div class="ccard__delta num <%= trend_class(card.delta) %>" title="Изменение за сутки">
       <% if card.delta %>
         <%= render "shared/icon", name: (card.delta.negative? ? "down" : "up") %>

@@ -18,11 +18,15 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 // Only the initial payload is embedded in the page; every switch fetches
 // the needed series from GET /series.
 export default class extends Controller {
-  static targets = ["card", "seg", "canvas", "legend", "status", "tbody", "trend"]
+  static targets = ["card", "seg", "canvas", "legend", "status", "diverge", "tbody", "trend",
+                    "range", "fromDate", "toDate", "sourceBox"]
   static values = { initial: Object }
 
   connect() {
-    this.state = { currency: "USD", days: 30, source: "cbr", rows: 10 }
+    this.state = {
+      currency: "USD", period: 30, from: null, to: null,
+      sources: ["cbr", "erapi", "currencyapi"], tableSource: "all", rows: 10
+    }
     this.payload = this.initialValue
     this.onTheme = () => this.render()
     window.addEventListener("theme:change", this.onTheme)
@@ -44,8 +48,29 @@ export default class extends Controller {
 
   setOption(event) {
     const { key, value } = event.currentTarget.dataset
-    this.state[key] = key === "days" || key === "rows" ? Number(value) : value
-    key === "rows" ? this.render() : this.load()
+    const num = Number(value)
+    this.state[key] = Number.isNaN(num) ? value : num
+
+    if (key === "rows" || key === "tableSource") return this.render()
+    if (key === "period") {
+      this.rangeTarget.hidden = this.state.period !== "custom"
+      // A custom range only makes sense once at least the start date is set.
+      if (this.state.period === "custom" && !this.state.from) return this.render()
+    }
+    this.load()
+  }
+
+  // Custom period: two date fields; refetch as soon as a start date exists.
+  setRange() {
+    this.state.from = this.fromDateTarget.value || null
+    this.state.to = this.toDateTarget.value || null
+    if (this.state.from) this.load()
+  }
+
+  toggleSource() {
+    const checked = this.sourceBoxTargets.filter((b) => b.checked).map((b) => b.value)
+    this.state.sources = ["cbr", "erapi", "currencyapi"].filter((p) => checked.includes(p))
+    this.state.sources.length ? this.load() : this.render()
   }
 
   // ----- data -----
@@ -53,11 +78,10 @@ export default class extends Controller {
   // Fetches the series for the current state and re-renders. A failed fetch
   // keeps the previous data on screen and reports the problem in the status line.
   async load() {
-    const params = new URLSearchParams({
-      currency: this.state.currency,
-      providers: this.providers().join(","),
-      from: isoDaysAgo(this.state.days)
-    })
+    const params = new URLSearchParams({ currency: this.state.currency, providers: this.providers().join(",") })
+    const { from, to } = this.range()
+    if (from) params.set("from", from)
+    if (to) params.set("to", to)
     this.abortController?.abort()
     this.abortController = new AbortController()
     this.render()
@@ -85,7 +109,14 @@ export default class extends Controller {
   }
 
   providers() {
-    return this.state.source === "both" ? ["cbr", "erapi"] : [this.state.source]
+    return this.state.sources
+  }
+
+  // {from, to} of the selected period; "all" means no bounds at all.
+  range() {
+    if (this.state.period === "all") return {}
+    if (this.state.period === "custom") return { from: this.state.from, to: this.state.to }
+    return { from: isoDaysAgo(this.state.period) }
   }
 
   // Rolling-mean forecast for the first visible provider that has enough data.
@@ -109,11 +140,40 @@ export default class extends Controller {
   render() {
     this.cardTargets.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.currency === this.state.currency)))
     this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
+    this.sourceBoxTargets.forEach((b) => (b.checked = this.state.sources.includes(b.value)))
     this.renderChart()
     this.renderLegend()
+    this.renderDiverge()
     this.renderStatus()
     this.renderTable()
     this.renderTrend()
+  }
+
+  // Spread between sources on the most recent date at least two of them share.
+  renderDiverge() {
+    const withData = this.providers().filter((p) => this.points(p).length)
+    if (withData.length < 2) {
+      const only = withData.length === 1 ? ` — данные только от одного источника (${PROVIDER_NAMES[withData[0]]})` : ""
+      this.divergeTarget.innerHTML = withData.length ? `<span>Расхождение не посчитать${only}</span>` : ""
+      return
+    }
+
+    const byDate = {}
+    withData.forEach((p) => this.points(p).forEach(([d, v]) => ((byDate[d] ||= {})[p] = v)))
+    const common = Object.keys(byDate).filter((d) => Object.keys(byDate[d]).length >= 2).sort().at(-1)
+    if (!common) {
+      this.divergeTarget.innerHTML = `<span>Расхождение не посчитать — у источников нет общих дат в этом периоде</span>`
+      return
+    }
+
+    const entries = Object.entries(byDate[common])
+    const values = entries.map(([, v]) => v)
+    const spread = Math.max(...values) - Math.min(...values)
+    const pct = spread / Math.min(...values) * 100
+    const detail = entries.map(([p, v]) => `${PROVIDER_NAMES[p]} ${fmtRub.format(v)}`).join(" · ")
+    this.divergeTarget.innerHTML =
+      `<span>Расхождение на ${dateRu(common)}: <b>${fmtRub.format(spread)} ₽ · ${fmtPct.format(pct)}%</b></span>` +
+      `<span class="dot">${detail}</span>`
   }
 
   renderTrend() {
@@ -146,15 +206,17 @@ export default class extends Controller {
   }
 
   renderLegend() {
+    const swatch = { cbr: "", erapi: "legend__swatch--alt", currencyapi: "legend__swatch--alt2" }
     const items = this.providers().map((p) =>
-      `<span class="legend__item"><span class="legend__swatch ${p === "cbr" ? "" : "legend__swatch--alt"}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`)
+      `<span class="legend__item"><span class="legend__swatch ${swatch[p]}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`)
     if (this.trend()) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed"></span>Прогноз</span>`)
     this.legendTarget.innerHTML = items.join("")
   }
 
   renderTable() {
+    const shown = this.providers().filter((p) => this.state.tableSource === "all" || p === this.state.tableSource)
     // Day-over-day change is computed inside each provider's own series.
-    const rows = this.providers().flatMap((p) => {
+    const rows = shown.flatMap((p) => {
       const pts = this.points(p)
       return pts.map(([d, v], i) => ({ d, v, p, delta: i > 0 ? v - pts[i - 1][1] : null, prev: i > 0 ? pts[i - 1][1] : null }))
     })
@@ -228,6 +290,10 @@ export default class extends Controller {
       })
     }
 
+    // Multi-year ranges label ticks with the year alone; "dd.mm" is useless there.
+    const yearSpan = labels.length ? Number(labels.at(-1).slice(0, 4)) - Number(labels[0].slice(0, 4)) : 0
+    const tickLabel = (iso) => (yearSpan >= 2 ? iso.slice(0, 4) : dateShort(iso))
+
     const data = { labels, datasets }
     const options = {
       responsive: true,
@@ -256,7 +322,7 @@ export default class extends Controller {
         x: {
           grid: { display: false },
           border: { color: line },
-          ticks: { color: text3, maxTicksLimit: 8, maxRotation: 0, font: { family: "JetBrains Mono", size: 11 }, callback: (v) => dateShort(labels[v]) }
+          ticks: { color: text3, maxTicksLimit: 8, maxRotation: 0, font: { family: "JetBrains Mono", size: 11 }, callback: (v) => tickLabel(labels[v]) }
         },
         y: {
           position: "right",
