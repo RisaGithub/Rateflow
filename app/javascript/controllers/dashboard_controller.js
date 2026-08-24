@@ -241,6 +241,8 @@ export default class extends Controller {
   }
 
   renderChart() {
+    if (typeof Chart === "undefined") return // chart script missing — keep the rest of the page alive
+
     const colors = { cbr: cssVar("--accent"), erapi: cssVar("--text-3"), currencyapi: cssVar("--text-2") }
     const text3 = cssVar("--text-3")
     const line = cssVar("--line")

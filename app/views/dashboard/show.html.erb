@@ -1,5 +1,6 @@
 <% content_for :head do %>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js" crossorigin="anonymous"></script>
+  <%# Vendored (not CDN) so the chart still renders with no internet access. %>
+  <%= javascript_include_tag "chart.umd", "data-turbo-track": "reload" %>
 <% end %>
 
 <div data-controller="dashboard" data-dashboard-initial-value="<%= @dashboard.initial_series.to_json %>" class="page" style="padding:0">
