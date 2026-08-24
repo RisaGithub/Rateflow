@@ -445,7 +445,8 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
   color: var(--text-3);
   font-family: var(--font-mono);
 }
-.stats--duo { flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* The 2x2 stats block hugs the right edge; the donut stays pinned left. */
+.stats--duo { margin-left: auto; grid-template-columns: repeat(2, minmax(0, auto)); gap: 12px 48px; }
 .donut { display: block; }
 .donut__track { stroke: var(--line-strong); }
 .donut__value { stroke: var(--up); }
@@ -505,6 +506,7 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
   .converter__grid { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; }
   .chart-wrap { height: 240px; }
+  .stats--duo { margin-left: 0; flex: 1; gap: 12px 16px; }
   .playback { flex-wrap: wrap; }
   .playback__slider { flex-basis: 100%; order: 1; }
   .topbar__inner { gap: 10px; }
