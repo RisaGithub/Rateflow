@@ -1,5 +1,8 @@
 <%# Matured-forecast scoring per provider. No invented numbers: until a
-    forecast point has actually come true, the card says so in plain words. %>
+    forecast point has actually come true, the card says so in plain words.
+    The two providers are measured differently — АПЭКОН by its actually
+    published forecasts, our own model by a historical backtest — and each
+    card names its method so the numbers are never silently mixed. %>
 <section class="section">
   <div class="section__head">
     <%= render "shared/icon", name: "target" %>
@@ -11,7 +14,9 @@
         <div class="provider__head">
           <div>
             <h3 class="provider__name"><%= provider_name(report.provider) %></h3>
-            <div class="provider__url">сравнение с фактом ЦБ РФ по сбывшимся точкам прогноза</div>
+            <div class="provider__url"><%= report.provider == "internal" ?
+              "бэктест: прогнозы пересчитаны по историческим данным и сверены с фактом ЦБ РФ" :
+              "фактически опубликованные прогнозы, сверенные с фактом ЦБ РФ" %></div>
           </div>
         </div>
         <% if report.samples.zero? %>

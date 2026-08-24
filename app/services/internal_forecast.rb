@@ -24,10 +24,15 @@ class InternalForecast
     return nil unless provider
 
     dates, values = Rate.for(currency, provider).chronological.pluck(:on_date, :value).transpose
-    points = project(values.map(&:to_f)).each_with_index.map do |value, i|
+    ForecastRun.store(provider: "internal", currency: currency, points: points_for(dates, values))
+  end
+
+  # Forecast points continuing the given series — shared with the historical
+  # backtest so replayed forecasts use exactly the live model.
+  def points_for(dates, values)
+    project(values.map(&:to_f)).each_with_index.map do |value, i|
       { horizon_date: dates.last + i + 1, value: value.round(4), low: nil, high: nil }
     end
-    ForecastRun.store(provider: "internal", currency: currency, points: points)
   end
 
   private
