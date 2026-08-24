@@ -304,6 +304,9 @@ svg.icon { flex: none; }
 /* ---------- Two-column area: trend + converter ---------- */
 
 .duo { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+/* Pin the heads to the top and stretch the cards, so both columns line up
+   even when their content heights differ. */
+.duo > .section { grid-template-rows: auto 1fr; align-content: stretch; }
 
 .panel { padding: 16px; display: grid; gap: 12px; align-content: start; }
 .panel__row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
