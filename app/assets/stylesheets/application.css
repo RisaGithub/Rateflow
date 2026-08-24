@@ -163,6 +163,9 @@ svg.icon { flex: none; }
 }
 
 .section { display: grid; gap: 12px; }
+/* Grid children default to min-width:auto, which would let a wide table
+   stretch the whole page instead of scrolling inside its wrapper. */
+.page > *, .section > * { min-width: 0; }
 
 .section__head {
   display: flex;
@@ -528,6 +531,8 @@ button.pager__link { border: 0; background: none; cursor: pointer; }
   .playback__slider { flex-basis: 100%; order: 1; }
   .topbar__inner { gap: 10px; }
   .brand { font-size: 15px; gap: 8px; }
+  /* Three nav links don't fit next to the wordmark — the logo carries the brand. */
+  .brand span { display: none; }
   .nav { margin-left: 0; gap: 2px; }
   .nav__link { padding: 6px 8px; }
   .page-title { font-size: 18px; }
