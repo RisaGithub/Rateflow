@@ -14,9 +14,11 @@ class RatesFetcher
 
   # Returns total number of rows written.
   def call
-    @providers.sum do |provider|
+    written = @providers.sum do |provider|
       Rate.store(attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }, provider.key)
     end
+    refresh_internal_forecast if written.positive?
+    written
   end
 
   private
@@ -36,6 +38,15 @@ class RatesFetcher
     # Anything unexpected must not take the app down — record it and move on.
     log(provider, started, ok: false, error: "#{e.class}: #{e.message}")
     []
+  end
+
+  # Every data update re-snapshots our own forecast (deduped inside), so the
+  # internal forecast history tracks the data it was built from. Its failure
+  # must not sink the fetch itself.
+  def refresh_internal_forecast
+    InternalForecast.new(currencies: @currencies).call
+  rescue StandardError => e
+    Rails.logger.error("InternalForecast failed: #{e.class}: #{e.message}")
   end
 
   def log(provider, started, ok:, status: nil, count: 0, error: nil)
