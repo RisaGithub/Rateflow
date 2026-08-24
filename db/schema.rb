@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_090002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,6 +27,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090002) do
     t.index ["provider", "created_at"], name: "index_fetch_logs_on_provider_and_created_at"
   end
 
+  create_table "forecast_points", force: :cascade do |t|
+    t.bigint "forecast_run_id", null: false
+    t.decimal "high", precision: 12, scale: 4
+    t.date "horizon_date", null: false
+    t.decimal "low", precision: 12, scale: 4
+    t.decimal "value", precision: 12, scale: 4, null: false
+    t.index ["forecast_run_id", "horizon_date"], name: "index_forecast_points_on_forecast_run_id_and_horizon_date", unique: true
+    t.index ["forecast_run_id"], name: "index_forecast_points_on_forecast_run_id"
+  end
+
+  create_table "forecast_runs", force: :cascade do |t|
+    t.datetime "captured_at", null: false
+    t.datetime "created_at", null: false
+    t.string "currency", null: false
+    t.integer "points_count", default: 0, null: false
+    t.string "provider", null: false
+    t.string "source_url"
+    t.datetime "updated_at", null: false
+    t.index ["provider", "currency", "captured_at"], name: "index_forecast_runs_on_provider_and_currency_and_captured_at"
+  end
+
   create_table "rates", force: :cascade do |t|
     t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.string "currency", null: false
@@ -36,4 +57,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090002) do
     t.decimal "value", precision: 12, scale: 4, null: false
     t.index ["currency", "provider", "on_date"], name: "index_rates_on_currency_and_provider_and_on_date", unique: true
   end
+
+  add_foreign_key "forecast_points", "forecast_runs", on_delete: :cascade
 end
