@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -19,11 +19,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
     t.integer "duration_ms", default: 0, null: false
     t.text "error_message"
     t.integer "http_status"
+    t.string "kind", default: "rates", null: false
     t.boolean "ok", default: false, null: false
     t.string "provider", null: false
     t.integer "records_count", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["created_at"], name: "index_fetch_logs_on_created_at"
+    t.index ["kind", "created_at"], name: "index_fetch_logs_on_kind_and_created_at"
     t.index ["provider", "created_at"], name: "index_fetch_logs_on_provider_and_created_at"
   end
 
