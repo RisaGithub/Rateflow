@@ -432,9 +432,9 @@ export default class extends Controller {
     })
 
     const fact = this.factFor(date)
-    if (fact != null) {
+    if (fact) {
       const factColor = cssVar("--text-3")
-      datasets.push({ label: "Факт ЦБ РФ", data: labels.map(() => fact), borderColor: factColor,
+      datasets.push({ label: "Факт ЦБ РФ", data: labels.map(() => fact[1]), borderColor: factColor,
                       borderWidth: 1.5, tension: 0, spanGaps: true, fill: false, pointRadius: 0, pointHoverRadius: 0 })
     }
 
@@ -446,11 +446,13 @@ export default class extends Controller {
       const cls = r.provider === "apecon" ? "legend__swatch--apecon" : ""
       return `<span class="legend__item"><span class="legend__swatch ${cls}"></span>${FORECAST_NAMES[r.provider]} · ${r.points.length} снимков</span>`
     })
-    if (fact != null) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>Факт ЦБ РФ</span>`)
+    if (fact) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>Факт ЦБ РФ</span>`)
     this.revisionLegendTarget.innerHTML = items.join("")
 
+    const today = new Date().toISOString().slice(0, 10)
     const parts = [`по оси X — дата снимка, по оси Y — что тогда прогнозировали на ${dateRu(date)}`]
-    parts.push(fact != null ? `факт ЦБ РФ: ${fmtRub.format(fact)} ₽` : "дата ещё не наступила — факта пока нет")
+    parts.push(fact ? `факт ЦБ РФ: ${fmtRub.format(fact[1])} ₽${fact[0] === date ? "" : ` (курс от ${dateRu(fact[0])})`}`
+      : date > today ? "дата ещё не наступила — факта пока нет" : "факта ЦБ РФ на эту дату нет")
     this.revisionStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
   }
 
@@ -478,9 +480,13 @@ export default class extends Controller {
     this.horizonSelectTarget.hidden = !dates.length
   }
 
+  // The [date, value] fact effective on the date. CBR skips weekends and
+  // holidays, so the closest earlier rate counts — but a week back at most.
   factFor(date) {
-    const hit = this.facts.find(([d]) => d === date)
-    return hit ? hit[1] : null
+    if (date > new Date().toISOString().slice(0, 10)) return null
+    const hit = [...this.facts].reverse().find(([d]) => d <= date)
+    if (!hit || new Date(date) - new Date(hit[0]) > 7 * 86400000) return null
+    return hit
   }
 
   renderMainLegend() {
