@@ -1,6 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 
 const fmt = (n, max = 2) => new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: max }).format(n)
+const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН" }
+const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
 
 // Instant in-browser conversion using the latest rate shown on the cards.
 export default class extends Controller {
@@ -20,10 +22,10 @@ export default class extends Controller {
 
   calc() {
     const cur = this.currencyTarget.value
-    const rate = this.ratesValue[cur]
+    const info = this.ratesValue[cur]
     const amount = parseFloat(this.amountTarget.value)
 
-    if (!rate) {
+    if (!info?.value) {
       this.resultTarget.textContent = "—"
       this.noteTarget.textContent = `Нет курса для ${cur}`
       return
@@ -35,8 +37,10 @@ export default class extends Controller {
     }
 
     const toRub = this.dir === "to_rub"
-    const value = toRub ? amount * rate : amount / rate
+    const value = toRub ? amount * info.value : amount / info.value
     this.resultTarget.textContent = toRub ? `${fmt(value)} ₽` : `${fmt(value, 4)} ${cur}`
-    this.noteTarget.textContent = `1 ${cur} = ${fmt(rate, 4)} ₽`
+    // Name the rate the conversion used — same one the currency card shows.
+    const source = [PROVIDER_NAMES[info.provider] || info.provider, info.date && dateRu(info.date)].filter(Boolean).join(", ")
+    this.noteTarget.textContent = `1 ${cur} = ${fmt(info.value, 4)} ₽${source ? ` · ${source}` : ""}`
   }
 }

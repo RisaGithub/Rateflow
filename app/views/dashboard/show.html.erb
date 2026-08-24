@@ -3,7 +3,8 @@
   <%= javascript_include_tag "chart.umd", "data-turbo-track": "reload" %>
 <% end %>
 
-<div data-controller="dashboard" data-dashboard-initial-value="<%= @dashboard.initial_series.to_json %>" class="page" style="padding:0">
+<div data-controller="dashboard" data-dashboard-initial-value="<%= @dashboard.initial_series.to_json %>"
+     data-dashboard-rates-value="<%= @dashboard.latest_rates.to_json %>" class="page" style="padding:0">
   <div>
     <h1 class="page-title">Курсы валют к рублю</h1>
     <p class="page-sub">USD, EUR, CNY и GBP из четырёх независимых источников: ЦБ РФ, ER-API, Currency API и АПЭКОН</p>
@@ -60,7 +61,7 @@
       </div>
       <%# Compact teaser: the nearest common forecast date from each source;
           everything deeper lives on the /forecasts page. %>
-      <div class="card panel" data-dashboard-target="forecast">
+      <div class="card panel panel--fill" data-dashboard-target="forecast">
         <p class="panel__note">Загрузка прогноза…</p>
       </div>
     </div>
@@ -70,7 +71,7 @@
         <%= render "shared/icon", name: "convert" %>
         <h2 class="section__title">Конвертер</h2>
       </div>
-      <div class="card panel" data-controller="converter" data-converter-rates-value="<%= @dashboard.latest_rates.to_json %>">
+      <div class="card panel panel--fill" data-controller="converter" data-converter-rates-value="<%= @dashboard.latest_rates.to_json %>">
         <div class="converter__grid">
           <div class="field">
             <label for="conv-amount">Сумма</label>
@@ -91,7 +92,7 @@
             <button type="button" class="seg__btn" data-converter-target="dir" data-value="from_rub" data-action="converter#setDir" aria-pressed="false">Из рублей</button>
           </div>
         </div>
-        <div>
+        <div class="converter__result">
           <div class="panel__label">Результат</div>
           <div class="panel__big" data-converter-target="result">—</div>
           <div class="panel__note" data-converter-target="note"></div>

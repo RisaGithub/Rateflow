@@ -13,9 +13,12 @@ class Dashboard
     @cards ||= Rate::CURRENCIES.map { |cur| card(cur) }
   end
 
-  # { "USD" => 82.92, ... } — the rate each card shows, used by the converter.
+  # { "USD" => { value:, provider:, date: }, ... } — the rate each card shows,
+  # so the converter and the forecast teaser can name what they compare against.
   def latest_rates
-    cards.select(&:value).to_h { |c| [ c.code, c.value ] }
+    cards.select(&:value).to_h do |c|
+      [ c.code, { value: c.value, provider: c.provider, date: c.on_date } ]
+    end
   end
 
   # Embedded in the page for the first paint (default chart state).

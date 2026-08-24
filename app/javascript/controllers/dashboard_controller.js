@@ -4,6 +4,7 @@ const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Curren
 const RATE_PROVIDERS = ["cbr", "erapi", "currencyapi", "apecon"]
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const fmtPct = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+const fmtDelta = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
 const dateShort = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7)
@@ -20,7 +21,7 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 export default class extends Controller {
   static targets = ["card", "seg", "canvas", "legend", "status", "diverge", "tbody", "forecast",
                     "range", "fromDate", "toDate", "sourceBox"]
-  static values = { initial: Object }
+  static values = { initial: Object, rates: Object }
 
   connect() {
     this.state = {
@@ -203,32 +204,45 @@ export default class extends Controller {
     const today = new Date().toISOString().slice(0, 10)
     const future = (provider) => (this.latestRun(provider)?.points || []).filter(([d]) => d > today)
     const outlook = { apecon: future("apecon"), internal: future("internal") }
-    const more = `<p class="panel__note"><a class="more-link" href="/forecasts">Подробнее о прогнозах →</a></p>`
+    const foot = `<div class="panel__foot"><span class="panel__note">Не является инвестиционной рекомендацией</span>` +
+      `<a class="more-link" href="/forecasts">Подробнее о прогнозах →</a></div>`
 
     if (!outlook.apecon.length && !outlook.internal.length) {
-      this.forecastTarget.innerHTML = `<p class="panel__note">Прогнозов для ${this.state.currency} пока нет.</p>${more}`
+      this.forecastTarget.innerHTML = `<p class="panel__note">Прогнозов для ${this.state.currency} пока нет.</p>${foot}`
       return
     }
 
     const apeconDates = new Set(outlook.apecon.map(([d]) => d))
     const common = outlook.internal.map(([d]) => d).find((d) => apeconDates.has(d))
     const head = common
-      ? `<div class="panel__label">На ${dateRu(common)} — ближайшую дату, которую покрывают оба источника</div>`
-      : `<div class="panel__label">Горизонты источников сейчас не пересекаются — у каждого его ближайшая дата</div>`
+      ? `<div class="panel__label">${this.state.currency} на ${dateRu(common)} — ближайшая дата, которую покрывают оба источника</div>`
+      : `<div class="panel__label">${this.state.currency} — горизонты источников не пересекаются, у каждого своя ближайшая дата</div>`
+
+    // Against the rate the currency card shows right now (server-embedded).
+    const current = this.ratesValue?.[this.state.currency]
+    const delta = (value) => {
+      if (!current?.value) return ""
+      const diff = value - current.value
+      const cls = diff > 0 ? "is-up" : diff < 0 ? "is-down" : "is-flat"
+      const sign = diff > 0 ? "+" : diff < 0 ? "−" : ""
+      return `<div class="forecast-cell__delta ${cls}">` +
+        `${sign}${fmtDelta.format(Math.abs(diff))} ₽ · ${sign}${fmtPct.format(Math.abs(diff / current.value * 100))}% к текущему курсу</div>`
+    }
 
     const cells = ["apecon", "internal"].flatMap((p) => {
       if (!outlook[p].length) return []
       const [date, value] = common ? outlook[p].find(([d]) => d === common) : outlook[p][0]
+      const swatch = p === "apecon" ? " legend__swatch--apecon" : ""
       return [`
-        <div>
-          <div class="panel__label">${PROVIDER_NAMES[p]}${common ? "" : ` · ${dateRu(date)}`}</div>
+        <div class="forecast-cell">
+          <div class="panel__label"><span class="legend__swatch legend__swatch--dashed${swatch}"></span>` +
+            `${PROVIDER_NAMES[p]}${common ? "" : ` · ${dateRu(date)}`}</div>
           <div class="panel__big">${fmtRub.format(value)} ₽</div>
+          ${delta(value)}
         </div>`]
     })
 
-    this.forecastTarget.innerHTML =
-      `${head}<div class="panel__row">${cells.join("")}</div>` +
-      `<p class="panel__note">не является инвестиционной рекомендацией</p>${more}`
+    this.forecastTarget.innerHTML = `${head}<div class="forecast-cells">${cells.join("")}</div>${foot}`
   }
 
   renderLegend() {
