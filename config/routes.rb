@@ -4,5 +4,8 @@ Rails.application.routes.draw do
   get "forecasts", to: "forecasts#show"
   get "sources", to: "sources#show"
 
+  get "cron/refresh", to: "cron#refresh"
+  get "cron/forecasts", to: "cron#forecasts"
+
   get "up" => "rails/health#show", as: :rails_health_check
 end
