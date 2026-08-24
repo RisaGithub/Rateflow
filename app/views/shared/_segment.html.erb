@@ -1,0 +1,11 @@
+<%# Segmented control bound to a Stimulus controller's state key.
+    scope: the controller name; options: [[value, label], ...] %>
+<div class="control">
+  <span class="control__label"><%= label %></span>
+  <div class="seg" role="group" aria-label="<%= label %>">
+    <% options.each do |value, text| %>
+      <button type="button" class="seg__btn" data-<%= scope %>-target="seg" data-key="<%= key %>" data-value="<%= value %>"
+              data-action="<%= scope %>#setOption" aria-pressed="false"><%= text %></button>
+    <% end %>
+  </div>
+</div>

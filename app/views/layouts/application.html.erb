@@ -29,6 +29,7 @@
         <% end %>
         <nav class="nav">
           <%= link_to "Дашборд", root_path, class: "nav__link", "aria-current": (current_page?(root_path) ? "page" : nil) %>
+          <%= link_to "Прогнозы", forecasts_path, class: "nav__link", "aria-current": (current_page?(forecasts_path) ? "page" : nil) %>
           <%= link_to "Источники", sources_path, class: "nav__link", "aria-current": (current_page?(sources_path) ? "page" : nil) %>
         </nav>
         <button type="button" class="theme-toggle" data-controller="theme" data-action="theme#toggle" aria-label="Переключить тему" title="Переключить тему">

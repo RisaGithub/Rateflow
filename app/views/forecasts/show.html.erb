@@ -1,0 +1,38 @@
+<% content_for :title, "Прогнозы — Rateflow" %>
+<% content_for :head do %>
+  <%# Vendored (not CDN) so the charts still render with no internet access. %>
+  <%= javascript_include_tag "chart.umd", "data-turbo-track": "reload" %>
+<% end %>
+
+<div data-controller="forecasts" class="page" style="padding:0">
+  <div>
+    <h1 class="page-title">Прогнозы курса</h1>
+    <p class="page-sub">Снимки прогнозов АПЭКОН и модели Rateflow поверх факта ЦБ РФ: версии, их дрейф и точность</p>
+  </div>
+
+  <%# Shared controls: every block below obeys the same currency and source choice. %>
+  <div class="controls">
+    <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
+    <%= render "shared/segment", scope: "forecasts", key: "source", label: "Источники",
+               options: [["apecon", "АПЭКОН"], ["internal", "Rateflow"], ["both", "Оба"]] %>
+  </div>
+
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "chart" %>
+      <h2 class="section__title">Прогноз поверх факта</h2>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-wrap"><canvas data-forecasts-target="mainCanvas" role="img" aria-label="Прогноз поверх фактического курса"></canvas></div>
+      <div class="playback" data-forecasts-target="playback" hidden>
+        <button type="button" class="playback__btn" data-forecasts-target="playBtn" data-action="forecasts#togglePlay"
+                aria-label="Проиграть историю прогноза">▶</button>
+        <input type="range" class="playback__slider" min="0" max="0" value="0" step="1"
+               data-forecasts-target="playSlider" data-action="input->forecasts#scrub" aria-label="Версия прогноза">
+        <span class="playback__label" data-forecasts-target="playLabel"></span>
+      </div>
+      <div class="legend" data-forecasts-target="mainLegend"></div>
+      <div class="status-line" data-forecasts-target="mainStatus"></div>
+    </div>
+  </section>
+</div>

@@ -4,6 +4,10 @@
 class ForecastsController < ApplicationController
   CACHE_TTL = 10.minutes
 
+  # The Прогнозы page; its charts fetch JSON from #data client-side.
+  def show
+  end
+
   def data
     return render json: ForecastSeries.run_as_json(ForecastRun.find(params[:run])) if params[:run]
 

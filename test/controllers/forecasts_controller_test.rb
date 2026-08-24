@@ -6,6 +6,14 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
                       points: [ { horizon_date: Date.new(2026, 9, 1), value: BigDecimal(value), low: nil, high: nil } ])
   end
 
+  test "GET /forecasts renders the page with shared controls" do
+    get forecasts_path
+
+    assert_response :success
+    assert_select "h1", text: "Прогнозы курса"
+    assert_select "[data-controller=forecasts]"
+  end
+
   test "returns every snapshot for the currency, oldest first, both providers" do
     store("apecon", "USD", Time.utc(2026, 8, 20), "80")
     store("apecon", "USD", Time.utc(2026, 8, 22), "81")
