@@ -471,6 +471,9 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
    cross-comparable — those get the accent tint, the rest step back. */
 .accuracy-table tr.is-comparable td { background: var(--accent-soft); }
 .accuracy-table tr.is-dim td { color: var(--text-3); }
+/* Its header may wrap — a nowrap header would out-width a narrow card. */
+.accuracy-table th { white-space: normal; }
+.providers > * { min-width: 0; }
 
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .filters .select { width: auto; height: 30px; font-size: 12px; }
