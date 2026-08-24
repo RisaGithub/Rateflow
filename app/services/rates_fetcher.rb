@@ -15,7 +15,7 @@ class RatesFetcher
   # Returns total number of rows written.
   def call
     @providers.sum do |provider|
-      store(attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }, provider.key)
+      Rate.store(attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }, provider.key)
     end
   end
 
@@ -43,14 +43,6 @@ class RatesFetcher
       provider: provider.key, ok: ok, http_status: status, duration_ms: now_ms - started,
       records_count: count, error_message: error&.truncate(1000)
     )
-  end
-
-  def store(records, provider)
-    return 0 if records.empty?
-
-    rows = records.map { |r| r.merge(provider: provider) }
-    Rate.upsert_all(rows, unique_by: %i[currency provider on_date], record_timestamps: true)
-    rows.size
   end
 
   def now_ms = Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond)

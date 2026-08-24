@@ -15,4 +15,14 @@ class Rate < ApplicationRecord
   def self.latest_for(currency, provider)
     self.for(currency, provider).order(on_date: :desc).first
   end
+
+  # Upserts provider records ({currency:, on_date:, value:}); returns row count.
+  # The unique index makes repeated loads idempotent.
+  def self.store(records, provider)
+    return 0 if records.empty?
+
+    rows = records.map { |r| r.merge(provider: provider) }
+    upsert_all(rows, unique_by: %i[currency provider on_date], record_timestamps: true)
+    rows.size
+  end
 end
