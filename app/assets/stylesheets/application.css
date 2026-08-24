@@ -422,6 +422,9 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 /* ---------- Sources page ---------- */
 
 .providers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+/* display:grid would beat the UA's [hidden] rule — the forecasts page hides
+   whole accuracy groups and single cards with the attribute. */
+.providers[hidden], .provider[hidden] { display: none; }
 .provider { padding: 16px; display: grid; gap: 14px; }
 .provider__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .provider__name { font-size: 15px; }

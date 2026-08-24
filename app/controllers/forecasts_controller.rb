@@ -4,8 +4,10 @@
 class ForecastsController < ApplicationController
   CACHE_TTL = 10.minutes
 
-  # The Прогнозы page; its charts fetch JSON from #data client-side.
+  # The Прогнозы page; its charts fetch JSON from #data client-side. Accuracy
+  # is pre-rendered per currency — the shared switches only toggle visibility.
   def show
+    @accuracy = Rate::CURRENCIES.index_with { |currency| ForecastAccuracy.new(currency: currency).reports }
   end
 
   def data

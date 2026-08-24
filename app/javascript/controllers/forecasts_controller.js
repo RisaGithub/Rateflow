@@ -31,7 +31,8 @@ const thinFromEnd = (items, max) => {
 export default class extends Controller {
   static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
                     "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
-                    "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus"]
+                    "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus",
+                    "accuracyGroup", "accuracyCard"]
 
   connect() {
     this.state = { currency: "USD", source: "both", horizonDate: null }
@@ -190,6 +191,13 @@ export default class extends Controller {
     this.renderMainStatus()
     this.renderFan()
     this.renderRevision()
+    this.renderAccuracy()
+  }
+
+  // Block 4 is server-rendered per currency; the switches only pick what shows.
+  renderAccuracy() {
+    this.accuracyGroupTargets.forEach((g) => (g.hidden = g.dataset.currency !== this.state.currency))
+    this.accuracyCardTargets.forEach((c) => (c.hidden = !this.sources().includes(c.dataset.provider)))
   }
 
   // Block 1: the fact as a muted solid line, active snapshots dashed on top,

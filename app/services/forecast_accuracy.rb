@@ -11,6 +11,12 @@ class ForecastAccuracy
 
   Report = Struct.new(:provider, :samples, :mae, :mape, :buckets, keyword_init: true)
 
+  # Optional currency narrows the scoring to one currency — the forecasts page
+  # shows a report per currency so its shared currency switch applies here too.
+  def initialize(currency: nil)
+    @currency = currency
+  end
+
   def reports
     ForecastRun::PROVIDERS.map { |provider| report(provider) }
   end
@@ -26,7 +32,7 @@ class ForecastAccuracy
   # [{abs:, pct:, lead:}, ...] — one entry per matured, comparable point.
   def errors_for(provider)
     points = ForecastPoint.joins(:forecast_run)
-                          .where(forecast_runs: { provider: provider })
+                          .where(forecast_runs: { provider: provider, currency: @currency || Rate::CURRENCIES })
                           .where(horizon_date: ..Date.current)
                           .pluck(:horizon_date, :value, "forecast_runs.currency", "forecast_runs.captured_at")
     return [] if points.empty?

@@ -5,8 +5,8 @@ class ForecastAccuracyTest < ActiveSupport::TestCase
     Rate.create!(provider: "cbr", currency: currency, on_date: date, value: value)
   end
 
-  def snapshot(captured_on, points, provider: "apecon")
-    ForecastRun.store(provider: provider, currency: "USD",
+  def snapshot(captured_on, points, provider: "apecon", currency: "USD")
+    ForecastRun.store(provider: provider, currency: currency,
                       points: points, captured_at: captured_on.to_time.utc)
   end
 
@@ -41,6 +41,20 @@ class ForecastAccuracyTest < ActiveSupport::TestCase
 
     assert_equal 0, report.samples
     assert_nil report.mae
+  end
+
+  test "currency option narrows scoring to that currency alone" do
+    fact(Date.new(2026, 6, 10), "100")
+    fact(Date.new(2026, 6, 10), "11", currency: "CNY")
+    snapshot(Date.new(2026, 6, 1), [ { horizon_date: Date.new(2026, 6, 10), value: BigDecimal("95"), low: nil, high: nil } ])
+    snapshot(Date.new(2026, 6, 1), [ { horizon_date: Date.new(2026, 6, 10), value: BigDecimal("10"), low: nil, high: nil } ],
+             currency: "CNY")
+
+    report = ForecastAccuracy.new(currency: "USD").report("apecon")
+
+    assert_equal 1, report.samples
+    assert_in_delta 5.0, report.mae, 0.0001
+    assert_equal 2, ForecastAccuracy.new.report("apecon").samples # без фильтра — обе валюты
   end
 
   test "providers are scored separately" do

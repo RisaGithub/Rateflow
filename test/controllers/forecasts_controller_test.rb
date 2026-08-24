@@ -12,6 +12,7 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Прогнозы курса"
     assert_select "[data-controller=forecasts]"
+    assert_select "[data-forecasts-target=accuracyGroup]", count: Rate::CURRENCIES.size
   end
 
   test "returns every snapshot for the currency, oldest first, both providers" do
