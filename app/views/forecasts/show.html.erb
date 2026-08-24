@@ -10,9 +10,11 @@
     <p class="page-sub">Снимки прогнозов АПЭКОН и модели Rateflow поверх факта ЦБ РФ: версии, их дрейф и точность</p>
   </div>
 
-  <%# Shared controls: every block below obeys the same currency and source choice. %>
+  <%# Shared controls: every block below obeys the same currency, period and source choice. %>
   <div class="controls">
     <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
+    <%= render "shared/segment", scope: "forecasts", key: "period", label: "Период",
+               options: [[30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"]] %>
     <%= render "shared/segment", scope: "forecasts", key: "source", label: "Источники",
                options: [["apecon", "АПЭКОН"], ["internal", "Rateflow"], ["both", "Оба"]] %>
   </div>

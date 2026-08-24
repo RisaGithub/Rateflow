@@ -2,8 +2,6 @@ import { Controller } from "@hotwired/stimulus"
 
 const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Прогноз Rateflow" }
 const SOURCE_NAMES = { apecon: "АПЭКОН", internal: "Rateflow" }
-// Facts cover the backtest span, so matured forecast horizons meet their CBR line.
-const FACT_DAYS = 730
 const FAN_MAX = 60 // more translucent lines than this is mud, not a fan
 const PAGE_SIZE = 50 // snapshot table rows per page, same as the sources log
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
@@ -27,18 +25,22 @@ const thinEven = (items, max) => {
   return [...picked].sort((a, b) => a - b).map((i) => items[i])
 }
 
-// The Прогнозы page: one currency + source choice drives every block.
-// Facts come from GET /series (CBR only), forecast snapshots from
+// The Прогнозы page: one currency + period + source choice drives every
+// block. Facts come from GET /series (CBR only), forecast snapshots from
 // GET /forecasts/data; the browser only picks snapshots and draws them.
+// The period bounds the fact line and the snapshot capture dates — the
+// forecast part of the main chart always shows in full.
 export default class extends Controller {
   static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
                     "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
                     "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus",
-                    "accuracyGroup", "accuracyCard",
+                    "accuracyBox", "accuracyGroup", "accuracyCard",
                     "snapshotsBody", "pagerPrev", "pagerNext", "pagerInfo"]
 
   connect() {
-    this.state = { currency: "USD", source: "both", horizonDate: null }
+    // period 90 mirrors ForecastsController::DEFAULT_PERIOD_DAYS — the
+    // server pre-renders the accuracy block for the same window.
+    this.state = { currency: "USD", period: 90, source: "both", horizonDate: null }
     this.runIndex = null
     this.pinned = {} // exact table-picked snapshots by provider
     this.selectedRunId = null
@@ -56,6 +58,7 @@ export default class extends Controller {
     window.removeEventListener("theme:change", this.onTheme)
     this.stopPlay()
     this.abort?.abort()
+    this.accuracyAbort?.abort()
     Object.values(this.charts).forEach((c) => c.destroy())
   }
 
@@ -63,10 +66,15 @@ export default class extends Controller {
 
   setOption(event) {
     const { key, value } = event.currentTarget.dataset
-    this.state[key] = value
+    const num = Number(value)
+    this.state[key] = Number.isNaN(num) ? value : num
     this.resetPlayback()
     this.page = 1
-    key === "currency" ? this.load() : this.render()
+    if (key === "source") return this.render()
+    // Currency and period both change what the server should send; the
+    // accuracy block only depends on the period (it holds every currency).
+    if (key === "period") this.loadAccuracy()
+    this.load()
   }
 
   setHorizon(event) {
@@ -121,10 +129,12 @@ export default class extends Controller {
     this.abort?.abort()
     this.abort = new AbortController()
     const { currency } = this.state
+    const from = this.periodFrom()
+    const range = from ? `&from=${from}` : ""
     try {
       const [facts, forecasts] = await Promise.all([
-        this.fetchJson(`/series?currency=${currency}&providers=cbr&from=${isoDaysAgo(FACT_DAYS)}`),
-        this.fetchJson(`/forecasts/data?currency=${currency}`)
+        this.fetchJson(`/series?currency=${currency}&providers=cbr${range}`),
+        this.fetchJson(`/forecasts/data?currency=${currency}${range}`)
       ])
       this.facts = facts.series?.cbr?.points || []
       this.payload = forecasts
@@ -133,6 +143,29 @@ export default class extends Controller {
       if (error.name === "AbortError") return
       this.mainStatusTarget.innerHTML = `<span>Не удалось загрузить данные — попробуйте обновить страницу</span>`
     }
+  }
+
+  // The accuracy section is server-rendered HTML: refetched per period,
+  // while currency and source switches only toggle what is visible.
+  async loadAccuracy() {
+    this.accuracyAbort?.abort()
+    this.accuracyAbort = new AbortController()
+    const from = this.periodFrom()
+    try {
+      const response = await fetch(`/forecasts/accuracy${from ? `?from=${from}` : ""}`,
+        { signal: this.accuracyAbort.signal })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      this.accuracyBoxTarget.innerHTML = await response.text()
+      this.renderAccuracy()
+    } catch (error) {
+      if (error.name === "AbortError") return
+      this.accuracyBoxTarget.innerHTML = `<p class="panel__note">Не удалось загрузить точность — попробуйте обновить страницу</p>`
+    }
+  }
+
+  // ISO date the selected period starts on; null means no bound at all.
+  periodFrom() {
+    return this.state.period === "all" ? null : isoDaysAgo(this.state.period)
   }
 
   async fetchJson(url) {
@@ -236,7 +269,7 @@ export default class extends Controller {
   // ----- render -----
 
   render() {
-    this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(this.state[b.dataset.key] === b.dataset.value)))
+    this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
     this.renderMain()
     this.renderPlayback()
     this.renderMainLegend()
@@ -265,7 +298,7 @@ export default class extends Controller {
         <td class="num">${r.points_count}</td>
         <td>${r.horizon_to ? dateRu(r.horizon_to) : "—"}</td>
       </tr>`).join("")
-      : `<tr><td colspan="4" class="table-empty">Снимков для ${this.state.currency} пока нет</td></tr>`
+      : `<tr><td colspan="4" class="table-empty">${this.emptyNote()}</td></tr>`
 
     this.pagerPrevTarget.hidden = this.page <= 1
     this.pagerNextTarget.hidden = this.page >= pages
@@ -339,13 +372,18 @@ export default class extends Controller {
     this.upsert("main", this.mainCanvasTarget, { labels, datasets }, this.baseOptions(labels), mode)
   }
 
-  // Block 2: every stored snapshot at once, translucent — newer lines brighter
-  // and thicker. One look shows how the forecast drifted and how stable it is.
-  // Static by design: no animation, no hover, thinned to FAN_MAX per provider.
+  // Block 2: every snapshot captured in the period at once, translucent —
+  // newer lines brighter and thicker. One look shows how the forecast drifted
+  // and how stable it is. Static by design: no animation, no hover, thinned
+  // to FAN_MAX per provider; the true per-period totals come from the index.
   renderFan() {
     if (typeof Chart === "undefined") return
 
-    const fans = this.sources().map((p) => ({ provider: p, all: this.runs(p), shown: thinEven(this.runs(p), FAN_MAX) }))
+    const fans = this.sources().map((p) => ({
+      provider: p,
+      total: this.index(p).length || this.runs(p).length,
+      shown: thinEven(this.runs(p), FAN_MAX)
+    }))
     const labels = [...new Set([
       ...this.facts.map(([d]) => d),
       ...fans.flatMap((f) => f.shown.flatMap((r) => r.points.map(([d]) => d)))
@@ -377,8 +415,12 @@ export default class extends Controller {
     options.plugins.tooltip.enabled = false
     this.upsert("fan", this.fanCanvasTarget, { labels, datasets }, options, "none")
 
+    if (fans.every((f) => !f.shown.length)) {
+      this.fanStatusTarget.innerHTML = `<span>${this.emptyNote()}</span>`
+      return
+    }
     const parts = fans.map((f) =>
-      `${SOURCE_NAMES[f.provider]}: ${f.shown.length === f.all.length ? f.all.length : `${f.shown.length} из ${f.all.length} (прорежено)`} снимков`)
+      `${SOURCE_NAMES[f.provider]}: ${f.shown.length === f.total ? f.total : `${f.shown.length} из ${f.total} (прорежено)`} снимков`)
     parts.push("свежие снимки ярче и толще")
     this.fanStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
   }
@@ -396,7 +438,8 @@ export default class extends Controller {
       this.charts.revision?.destroy()
       delete this.charts.revision
       this.revisionLegendTarget.innerHTML = ""
-      this.revisionStatusTarget.innerHTML = `<span>Нет дат, на которые есть хотя бы три снимка прогноза</span>`
+      this.revisionStatusTarget.innerHTML =
+        `<span>Нет дат, на которые есть хотя бы три снимка прогноза${this.state.period === "all" ? "" : " в выбранном периоде"}</span>`
       return
     }
 
@@ -499,11 +542,16 @@ export default class extends Controller {
     this.mainLegendTarget.innerHTML = items.join("")
   }
 
+  // Says in plain words when the chosen period holds nothing to draw.
+  emptyNote() {
+    return `Снимков для ${this.state.currency} ${this.state.period === "all" ? "пока нет" : "в выбранном периоде нет"}`
+  }
+
   // Which snapshots are on screen right now.
   renderMainStatus() {
     const parts = this.sources().flatMap((provider) => {
       const run = this.activeRun(provider)
-      if (!run) return [`${FORECAST_NAMES[provider]}: снимков для ${this.state.currency} пока нет`]
+      if (!run) return [`${FORECAST_NAMES[provider]}: снимков ${this.state.period === "all" ? `для ${this.state.currency} пока нет` : "в выбранном периоде нет"}`]
       const position = this.runs(provider).indexOf(run)
       const version = position >= 0 ? ` (${position + 1} из ${this.runs(provider).length})` : " (выбран в таблице)"
       return [`${FORECAST_NAMES[provider]}: снимок от ${dateRu(run.captured_at.slice(0, 10))}${version} · ${run.points.length} тчк · до ${dateRu(run.points.at(-1)[0])}`]
