@@ -33,10 +33,10 @@ class AdminController < ApplicationController
   def refresh_forecasts
     result = ForecastsFetcher.new.call
     notice = case result[:status]
-             when "ok" then "Прогноз АПЭКОН по #{result[:currency]} обновлён: #{result[:points]} точек."
-             when "fresh" then "Все прогнозы АПЭКОН свежие (моложе суток) — обновлять нечего."
-             else "Прогноз по #{result[:currency]} не обновился: #{result[:error]}"
-             end
+    when "ok" then "Прогноз АПЭКОН по #{result[:currency]} обновлён: #{result[:points]} точек."
+    when "fresh" then "Все прогнозы АПЭКОН свежие (моложе суток) — обновлять нечего."
+    else "Прогноз по #{result[:currency]} не обновился: #{result[:error]}"
+    end
     redirect_to admin_path, notice: notice
   end
 

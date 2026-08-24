@@ -107,7 +107,7 @@ module Providers
     end
 
     def parse_html(body)
-      Nokogiri::HTML(body.to_s.force_encoding("utf-8"))
+      Nokogiri::HTML(body.to_s.dup.force_encoding("utf-8"))
     end
 
     # The monthly tables interleave two kinds of rows: a single-cell year header
