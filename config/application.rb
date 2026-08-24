@@ -18,6 +18,20 @@ require "rails/test_unit/railtie"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# Local convenience without a dotenv gem: in development and test, read a
+# git-ignored .env (KEY=value per line, # for comments) into ENV. Real
+# environments set variables through the host, so ENV always wins over the file.
+if %w[development test].include?(ENV.fetch("RAILS_ENV", "development"))
+  env_file = File.expand_path("../.env", __dir__)
+  if File.exist?(env_file)
+    File.foreach(env_file) do |line|
+      next unless line =~ /\A([A-Z0-9_]+)=(.*)\z/m
+
+      ENV[$1] ||= $2.strip.delete_prefix('"').delete_suffix('"')
+    end
+  end
+end
+
 module Rateflow
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
