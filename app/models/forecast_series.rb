@@ -1,4 +1,4 @@
-# Read model behind GET /forecasts: every stored snapshot (run + its points)
+# Read model behind GET /forecasts/data: every stored snapshot (run + its points)
 # for one currency, per provider — the payload the chart draws and the
 # version-playback slider scrubs through.
 class ForecastSeries

@@ -1,10 +1,10 @@
-# JSON forecast snapshots for the dashboard: all stored versions for one
-# currency, so the chart can draw the latest one and play back the history.
+# JSON forecast snapshots at GET /forecasts/data: all stored versions for one
+# currency, so the charts can draw the latest one and play back the history.
 # Cached the same way as /series.
 class ForecastsController < ApplicationController
   CACHE_TTL = 10.minutes
 
-  def show
+  def data
     payload = Rails.cache.fetch(cache_key, expires_in: CACHE_TTL) do
       ForecastSeries.new(currency: currency, providers: providers).as_json
     end

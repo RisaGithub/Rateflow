@@ -12,7 +12,7 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     store("internal", "USD", Time.utc(2026, 8, 22), "82")
     store("apecon", "EUR", Time.utc(2026, 8, 22), "95")
 
-    get forecasts_path(currency: "USD")
+    get forecasts_data_path(currency: "USD")
 
     assert_response :success
     body = response.parsed_body
@@ -26,7 +26,7 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
   test "provider param narrows the payload; unknown values are dropped" do
     store("apecon", "USD", Time.utc(2026, 8, 22), "81")
 
-    get forecasts_path(currency: "USD", provider: "apecon,bogus")
+    get forecasts_data_path(currency: "USD", provider: "apecon,bogus")
 
     assert_equal %w[apecon], response.parsed_body["series"].keys
   end

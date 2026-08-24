@@ -130,14 +130,14 @@ export default class extends Controller {
     return { from: isoDaysAgo(this.state.period) }
   }
 
-  // Forecast snapshots come from GET /forecasts: every stored version for the
-  // current currency, both providers at once. Computation happens server-side;
+  // Forecast snapshots come from GET /forecasts/data: every stored version for
+  // the current currency, both providers at once. Computation happens server-side;
   // the browser only picks a snapshot and draws it.
   async loadForecasts() {
     this.forecastAbort?.abort()
     this.forecastAbort = new AbortController()
     try {
-      const response = await fetch(`/forecasts?currency=${this.state.currency}`, {
+      const response = await fetch(`/forecasts/data?currency=${this.state.currency}`, {
         signal: this.forecastAbort.signal,
         headers: { Accept: "application/json" }
       })
