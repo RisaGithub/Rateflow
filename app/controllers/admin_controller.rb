@@ -42,7 +42,7 @@ class AdminController < ApplicationController
 
   def rebuild_internal
     count = InternalForecast.new.call
-    redirect_to admin_path, notice: "Собственный прогноз пересчитан для #{count} валют."
+    redirect_to admin_path, notice: "Прогноз Rateflow пересчитан для #{count} валют."
   end
 
   private

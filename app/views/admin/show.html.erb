@@ -60,7 +60,7 @@
         <span class="panel__note">одна валюта АПЭКОН — та, у которой снимок самый старый</span>
       <% end %>
       <%= form_with url: admin_rebuild_internal_path do |f| %>
-        <%= f.submit "Пересчитать собственный прогноз", class: "btn", data: { turbo_submits_with: "Считаем…" } %>
+        <%= f.submit "Пересчитать прогноз Rateflow", class: "btn", data: { turbo_submits_with: "Считаем…" } %>
         <span class="panel__note">скользящее среднее по всем валютам, без сети</span>
       <% end %>
     </div>

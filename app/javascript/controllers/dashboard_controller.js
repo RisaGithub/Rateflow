@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 
-const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН", internal: "Свой прогноз" }
+const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН", internal: "Rateflow" }
 const RATE_PROVIDERS = ["cbr", "erapi", "currencyapi", "apecon"]
-const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Свой прогноз" }
+const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Прогноз Rateflow" }
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const fmtPct = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
@@ -283,7 +283,7 @@ export default class extends Controller {
     const run = this.runs("internal").at(-1)
     const anchor = this.lastActual()
     if (!run || !run.points.length || !anchor) {
-      this.trendTarget.innerHTML = `<p class="panel__note">Недостаточно данных для собственного прогноза.</p>`
+      this.trendTarget.innerHTML = `<p class="panel__note">Недостаточно данных для прогноза Rateflow.</p>`
       return
     }
     const [endDate, end] = [run.points.at(-1)[0], run.points.at(-1)[1]]
