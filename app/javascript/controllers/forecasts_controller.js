@@ -15,6 +15,10 @@ const isoDaysAgo = (days) => {
   return d.toISOString().slice(0, 10)
 }
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+// Dot radius follows the x-axis density: the more labels share the width,
+// the smaller the dots — a five-year span must not turn into one blob.
+const dotRadius = (labelCount) =>
+  labelCount > 400 ? 1 : labelCount > 150 ? 1.5 : labelCount > 60 ? 2 : 2.5
 const alphaHex = (a) => Math.round(a * 255).toString(16).padStart(2, "0")
 // Evenly sampled max items; the first and the newest always survive.
 const thinEven = (items, max) => {
@@ -343,7 +347,7 @@ export default class extends Controller {
         tension: 0.25,
         spanGaps: true,
         fill: false,
-        pointRadius: line.provider === "apecon" ? 2.5 : 0,
+        pointRadius: line.provider === "apecon" ? dotRadius(labels.length) : 0,
         pointBackgroundColor: color,
         pointBorderColor: color,
         pointHoverRadius: 4,
@@ -464,7 +468,7 @@ export default class extends Controller {
         tension: 0.25,
         spanGaps: true,
         fill: false,
-        pointRadius: 2.5,
+        pointRadius: dotRadius(labels.length),
         pointBackgroundColor: color,
         pointBorderColor: color,
         pointHoverRadius: 4,
