@@ -429,8 +429,19 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .stat__label { color: var(--text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat__value { font-family: var(--font-mono); font-size: 18px; font-weight: 500; margin-top: 2px; }
-.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.bar__fill { height: 100%; background: var(--up); }
+/* Success share as a donut ring: track in the neutral line color, value arc
+   in the "up" green, percentage centered inside. */
+.stat__donut { margin-top: 4px; }
+.donut { display: block; }
+.donut__track { stroke: var(--line-strong); }
+.donut__value { stroke: var(--up); }
+.donut__num {
+  fill: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 500;
+}
 
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .filters .select { width: auto; height: 30px; font-size: 12px; }

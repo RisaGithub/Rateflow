@@ -27,7 +27,11 @@
         <div class="stats">
           <div>
             <div class="stat__label">Успешных</div>
-            <div class="stat__value"><%= p.success_rate ? "#{p.success_rate}%" : "—" %></div>
+            <% if p.success_rate %>
+              <div class="stat__donut" title="Доля успешных из последних <%= p.attempts %> попыток"><%= donut(p.success_rate) %></div>
+            <% else %>
+              <div class="stat__value">—</div>
+            <% end %>
           </div>
           <div>
             <div class="stat__label">Среднее время</div>
@@ -49,9 +53,6 @@
             <div class="stat__label">Точек</div>
             <div class="stat__value stat__value--sm"><%= number_with_delimiter(p.points_count, delimiter: " ") %></div>
           </div>
-        </div>
-        <div class="bar" title="Доля успешных из последних <%= p.attempts %> попыток">
-          <div class="bar__fill" style="width: <%= p.success_rate.to_i %>%"></div>
         </div>
         <div class="panel__note">Статистика по последним <%= p.attempts %> попыткам</div>
       </div>

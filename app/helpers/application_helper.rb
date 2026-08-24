@@ -44,4 +44,23 @@ module ApplicationHelper
   end
 
   def date_ru(date) = date&.strftime("%d.%m.%Y")
+
+  # Donut ring for a 0–100 percentage with the number in the middle.
+  # The arc starts at 12 o'clock and is drawn with stroke-dasharray.
+  def donut(pct, size: 48, stroke: 5)
+    half = size / 2.0
+    radius = half - stroke / 2.0
+    circumference = 2 * Math::PI * radius
+    ring = { cx: half, cy: half, r: radius, fill: "none", "stroke-width": stroke }
+
+    tag.svg(class: "donut", viewBox: "0 0 #{size} #{size}", width: size, height: size, role: "img",
+            "aria-label": "#{pct}% успешных") do
+      tag.circle(**ring, class: "donut__track") +
+        tag.circle(**ring, class: "donut__value", "stroke-linecap": "round",
+                   "stroke-dasharray": "#{(circumference * pct / 100.0).round(2)} #{circumference.round(2)}",
+                   transform: "rotate(-90 #{half} #{half})") +
+        tag.text("#{pct}%", x: half, y: half, class: "donut__num",
+                 "text-anchor": "middle", "dominant-baseline": "central")
+    end
+  end
 end
