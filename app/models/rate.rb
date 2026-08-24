@@ -1,6 +1,6 @@
 class Rate < ApplicationRecord
   CURRENCIES = %w[USD EUR CNY GBP].freeze
-  PROVIDERS = %w[cbr erapi currencyapi].freeze
+  PROVIDERS = %w[cbr erapi currencyapi apecon].freeze
 
   validates :currency, inclusion: { in: CURRENCIES }
   validates :provider, inclusion: { in: PROVIDERS }

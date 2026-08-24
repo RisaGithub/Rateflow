@@ -5,7 +5,8 @@ class ProviderStatus
   INFO = {
     "cbr"         => { name: "ЦБ РФ", role: "история с 1999 года", url: "cbr.ru/scripts/XML_dynamic.asp" },
     "erapi"       => { name: "ER-API", role: "только текущий день", url: "open.er-api.com/v6/latest/USD" },
-    "currencyapi" => { name: "Currency API", role: "срезы по датам", url: "cdn.jsdelivr.net/npm/@fawazahmed0/currency-api" }
+    "currencyapi" => { name: "Currency API", role: "срезы по датам", url: "cdn.jsdelivr.net/npm/@fawazahmed0/currency-api" },
+    "apecon"      => { name: "АПЭКОН", role: "прогнозы и котировки", url: "apecon.ru" }
   }.freeze
 
   attr_reader :key

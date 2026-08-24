@@ -1,7 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { forecast, backtest, nextDates, WINDOW, HORIZON } from "forecast"
 
-const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API" }
+const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН", internal: "Свой прогноз" }
+const RATE_PROVIDERS = ["cbr", "erapi", "currencyapi", "apecon"]
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const fmtPct = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
@@ -25,7 +26,7 @@ export default class extends Controller {
   connect() {
     this.state = {
       currency: "USD", period: 30, from: null, to: null,
-      sources: ["cbr", "erapi", "currencyapi"], tableSource: "all", rows: 10
+      sources: [...RATE_PROVIDERS], tableSource: "all", rows: 10
     }
     this.payload = this.initialValue
     this.onTheme = () => this.render()
@@ -69,7 +70,7 @@ export default class extends Controller {
 
   toggleSource() {
     const checked = this.sourceBoxTargets.filter((b) => b.checked).map((b) => b.value)
-    this.state.sources = ["cbr", "erapi", "currencyapi"].filter((p) => checked.includes(p))
+    this.state.sources = RATE_PROVIDERS.filter((p) => checked.includes(p))
     this.state.sources.length ? this.load() : this.render()
   }
 
@@ -206,7 +207,7 @@ export default class extends Controller {
   }
 
   renderLegend() {
-    const swatch = { cbr: "", erapi: "legend__swatch--alt", currencyapi: "legend__swatch--alt2" }
+    const swatch = { cbr: "", erapi: "legend__swatch--alt", currencyapi: "legend__swatch--alt2", apecon: "legend__swatch--apecon" }
     const items = this.providers().map((p) =>
       `<span class="legend__item"><span class="legend__swatch ${swatch[p]}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`)
     if (this.trend()) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed"></span>Прогноз</span>`)
@@ -243,7 +244,7 @@ export default class extends Controller {
   renderChart() {
     if (typeof Chart === "undefined") return // chart script missing — keep the rest of the page alive
 
-    const colors = { cbr: cssVar("--accent"), erapi: cssVar("--text-3"), currencyapi: cssVar("--text-2") }
+    const colors = { cbr: cssVar("--accent"), erapi: cssVar("--text-3"), currencyapi: cssVar("--text-2"), apecon: cssVar("--accent-2") }
     const text3 = cssVar("--text-3")
     const line = cssVar("--line")
     const provs = this.providers()

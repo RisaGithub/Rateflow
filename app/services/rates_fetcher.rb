@@ -1,4 +1,4 @@
-# Pulls rates for every currency from all three providers on every run.
+# Pulls rates for every currency from all four providers on every run.
 #
 # The providers are equals: each one is asked every time, each attempt is
 # recorded in FetchLog (one entry per provider per run), and each provider's
@@ -9,7 +9,7 @@ class RatesFetcher
     @from = days.days.ago.to_date
     @to = Date.current
     @currencies = currencies
-    @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new ]
+    @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new, Providers::Apecon.new ]
   end
 
   # Returns total number of rows written.

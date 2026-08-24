@@ -7,6 +7,7 @@
   --text-2: #4A5162;
   --text-3: #818899;
   --accent: #2547D8;
+  --accent-2: #B4540A;
   --up: #17795E;
   --down: #B03A48;
   --shadow: 0 1px 2px rgb(12 14 20 / 0.04), 0 4px 14px rgb(12 14 20 / 0.05);
@@ -21,6 +22,7 @@
     --text-2: #A6ADBF;
     --text-3: #737B8E;
     --accent: #7A93FF;
+    --accent-2: #F0A05A;
     --up: #4FCFA6;
     --down: #FF8A98;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.35);
@@ -35,6 +37,7 @@
   --text-2: #A6ADBF;
   --text-3: #737B8E;
   --accent: #7A93FF;
+  --accent-2: #F0A05A;
   --up: #4FCFA6;
   --down: #FF8A98;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.35);
@@ -273,6 +276,7 @@ svg.icon { flex: none; }
 .chip--cbr:has(input:checked) .chip__dot { background: var(--accent); opacity: 1; }
 .chip--erapi:has(input:checked) .chip__dot { background: var(--text-3); opacity: 1; }
 .chip--currencyapi:has(input:checked) .chip__dot { background: var(--text-2); opacity: 1; }
+.chip--apecon:has(input:checked) .chip__dot { background: var(--accent-2); opacity: 1; }
 
 /* Custom date range: one compact non-wrapping group. */
 .range { flex-wrap: nowrap; }
@@ -299,6 +303,7 @@ svg.icon { flex: none; }
 .legend__swatch { width: 14px; height: 0; border-top: 2px solid var(--accent); }
 .legend__swatch--alt { border-top-color: var(--text-3); }
 .legend__swatch--alt2 { border-top-color: var(--text-2); }
+.legend__swatch--apecon { border-top-color: var(--accent-2); }
 .legend__swatch--dashed { border-top-style: dashed; }
 
 /* ---------- Two-column area: trend + converter ---------- */

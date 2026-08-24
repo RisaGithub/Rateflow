@@ -16,6 +16,7 @@ module Providers
 
   class Base
     TIMEOUT = 10
+    USER_AGENT = "Rateflow/1.0 (+https://github.com/RisaGithub/Rateflow)".freeze
 
     def self.key
       name.demodulize.downcase
@@ -34,7 +35,7 @@ module Providers
       http.open_timeout = TIMEOUT
       http.read_timeout = TIMEOUT
 
-      response = http.get(uri.request_uri, { "User-Agent" => "Rateflow/1.0" })
+      response = http.get(uri.request_uri, { "User-Agent" => USER_AGENT })
       status = response.code.to_i
       raise Error.new("HTTP #{status}", http_status: status) unless response.is_a?(Net::HTTPSuccess)
 
