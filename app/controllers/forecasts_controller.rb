@@ -5,8 +5,10 @@ class ForecastsController < ApplicationController
   CACHE_TTL = 10.minutes
 
   def data
+    return render json: ForecastSeries.run_as_json(ForecastRun.find(params[:run])) if params[:run]
+
     payload = Rails.cache.fetch(cache_key, expires_in: CACHE_TTL) do
-      ForecastSeries.new(currency: currency, providers: providers).as_json
+      ForecastSeries.new(currency: currency, providers: providers, latest_only: latest_only?).as_json
     end
     render json: payload
   end
@@ -16,8 +18,12 @@ class ForecastsController < ApplicationController
   # updated_at moves on every new or refreshed snapshot, so a fresh fetch
   # invalidates every cached slice without explicit purging.
   def cache_key
-    [ "forecasts", currency, providers.join("-"), ForecastRun.maximum(:updated_at)&.to_i ]
+    [ "forecasts", currency, providers.join("-"), latest_only?, ForecastRun.maximum(:updated_at)&.to_i ]
   end
+
+  # ?latest=1 keeps only the newest snapshot per provider — enough for the
+  # dashboard teaser, a fraction of the full payload.
+  def latest_only? = params[:latest].present?
 
   def currency
     params[:currency].presence_in(Rate::CURRENCIES) || Rate::CURRENCIES.first

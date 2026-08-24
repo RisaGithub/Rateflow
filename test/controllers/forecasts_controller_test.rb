@@ -30,4 +30,28 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal %w[apecon], response.parsed_body["series"].keys
   end
+
+  test "latest=1 returns only the newest snapshot per provider, without index" do
+    store("apecon", "USD", Time.utc(2026, 8, 20), "80")
+    store("apecon", "USD", Time.utc(2026, 8, 22), "81")
+
+    get forecasts_data_path(currency: "USD", latest: "1")
+
+    runs = response.parsed_body.dig("series", "apecon", "runs")
+    assert_equal 1, runs.size
+    assert_equal [ [ "2026-09-01", 81.0, nil, nil ] ], runs[0]["points"]
+    assert_nil response.parsed_body.dig("series", "apecon", "index")
+  end
+
+  test "run param returns one exact snapshot" do
+    run = store("apecon", "USD", Time.utc(2026, 8, 20), "80")
+    store("apecon", "USD", Time.utc(2026, 8, 22), "81")
+
+    get forecasts_data_path(run: run.id)
+
+    body = response.parsed_body
+    assert_equal run.id, body["id"]
+    assert_equal "apecon", body["provider"]
+    assert_equal [ [ "2026-09-01", 80.0, nil, nil ] ], body["points"]
+  end
 end
