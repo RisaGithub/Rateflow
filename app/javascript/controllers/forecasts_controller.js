@@ -4,6 +4,7 @@ const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Пр�
 const SOURCE_NAMES = { apecon: "АПЭКОН", internal: "Rateflow" }
 // Facts cover the backtest span, so matured forecast horizons meet their CBR line.
 const FACT_DAYS = 730
+const FAN_MAX = 60 // more translucent lines than this is mud, not a fan
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
 const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
@@ -14,13 +15,22 @@ const isoDaysAgo = (days) => {
   return d.toISOString().slice(0, 10)
 }
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+const alphaHex = (a) => Math.round(a * 255).toString(16).padStart(2, "0")
+// Keep every Nth item counting back from the end so the newest always survives.
+const thinFromEnd = (items, max) => {
+  if (items.length <= max) return items
+  const step = Math.ceil(items.length / max)
+  const kept = []
+  for (let i = items.length - 1; i >= 0; i -= step) kept.push(items[i])
+  return kept.reverse()
+}
 
 // The Прогнозы page: one currency + source choice drives every block.
 // Facts come from GET /series (CBR only), forecast snapshots from
 // GET /forecasts/data; the browser only picks snapshots and draws them.
 export default class extends Controller {
   static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
-                    "mainLegend", "mainStatus"]
+                    "mainLegend", "mainStatus", "fanCanvas", "fanStatus"]
 
   connect() {
     this.state = { currency: "USD", source: "both" }
@@ -172,6 +182,7 @@ export default class extends Controller {
     this.renderPlayback()
     this.renderMainLegend()
     this.renderMainStatus()
+    this.renderFan()
   }
 
   // Block 1: the fact as a muted solid line, active snapshots dashed on top,
@@ -189,21 +200,7 @@ export default class extends Controller {
       ...lines.flatMap((l) => l.run.points.map(([d]) => d))
     ])].sort()
 
-    const factByDate = Object.fromEntries(this.facts)
-    const datasets = [{
-      label: "ЦБ РФ (факт)",
-      data: labels.map((d) => factByDate[d] ?? null),
-      borderColor: factColor,
-      borderWidth: 1.5,
-      tension: 0.25,
-      spanGaps: true,
-      fill: false,
-      pointRadius: 0,
-      pointHoverRadius: 4,
-      pointHoverBackgroundColor: factColor,
-      pointHoverBorderColor: cssVar("--card"),
-      pointHoverBorderWidth: 2
-    }]
+    const datasets = [this.factDataset(labels, factColor)]
 
     const anchor = this.facts.at(-1)
     for (const line of lines) {
@@ -249,6 +246,50 @@ export default class extends Controller {
     this.upsert("main", this.mainCanvasTarget, { labels, datasets }, this.baseOptions(labels), mode)
   }
 
+  // Block 2: every stored snapshot at once, translucent — newer lines brighter
+  // and thicker. One look shows how the forecast drifted and how stable it is.
+  // Static by design: no animation, no hover, thinned to FAN_MAX per provider.
+  renderFan() {
+    if (typeof Chart === "undefined") return
+
+    const fans = this.sources().map((p) => ({ provider: p, all: this.runs(p), shown: thinFromEnd(this.runs(p), FAN_MAX) }))
+    const labels = [...new Set([
+      ...this.facts.map(([d]) => d),
+      ...fans.flatMap((f) => f.shown.flatMap((r) => r.points.map(([d]) => d)))
+    ])].sort()
+
+    const datasets = [this.factDataset(labels, cssVar("--text-3"))]
+    for (const fan of fans) {
+      const color = this.colorOf(fan.provider)
+      const count = fan.shown.length
+      fan.shown.forEach((run, i) => {
+        const rank = count > 1 ? i / (count - 1) : 1
+        const byDate = Object.fromEntries(run.points.map(([d, v]) => [d, v]))
+        datasets.push({
+          label: `_${fan.provider}-${i}`,
+          data: labels.map((d) => byDate[d] ?? null),
+          borderColor: color + alphaHex(0.1 + rank * 0.9),
+          borderWidth: i === count - 1 ? 2.5 : 1 + rank,
+          tension: 0.25,
+          spanGaps: true,
+          fill: false,
+          pointRadius: 0
+        })
+      })
+    }
+
+    const options = this.baseOptions(labels)
+    options.animation = { duration: 0 }
+    options.events = [] // dozens of lines: hover picking would cost more than it tells
+    options.plugins.tooltip.enabled = false
+    this.upsert("fan", this.fanCanvasTarget, { labels, datasets }, options, "none")
+
+    const parts = fans.map((f) =>
+      `${SOURCE_NAMES[f.provider]}: ${f.shown.length === f.all.length ? f.all.length : `${f.shown.length} из ${f.all.length} (прорежено)`} снимков`)
+    parts.push("свежие снимки ярче и толще")
+    this.fanStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
+  }
+
   renderMainLegend() {
     const items = [`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>ЦБ РФ (факт)</span>`]
     this.sources().forEach((p) => {
@@ -272,6 +313,25 @@ export default class extends Controller {
   }
 
   // ----- chart plumbing -----
+
+  // The CBR fact as a muted solid line — the shared backdrop of every chart here.
+  factDataset(labels, color) {
+    const byDate = Object.fromEntries(this.facts)
+    return {
+      label: "ЦБ РФ (факт)",
+      data: labels.map((d) => byDate[d] ?? null),
+      borderColor: color,
+      borderWidth: 1.5,
+      tension: 0.25,
+      spanGaps: true,
+      fill: false,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: color,
+      pointHoverBorderColor: cssVar("--card"),
+      pointHoverBorderWidth: 2
+    }
+  }
 
   upsert(key, canvas, data, options, mode) {
     const chart = this.charts[key]

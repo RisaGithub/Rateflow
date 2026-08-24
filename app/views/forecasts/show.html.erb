@@ -35,4 +35,15 @@
       <div class="status-line" data-forecasts-target="mainStatus"></div>
     </div>
   </section>
+
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "trend" %>
+      <h2 class="section__title">Веер версий</h2>
+    </div>
+    <div class="card chart-card">
+      <div class="chart-wrap"><canvas data-forecasts-target="fanCanvas" role="img" aria-label="Все версии прогноза одним веером"></canvas></div>
+      <div class="status-line" data-forecasts-target="fanStatus"></div>
+    </div>
+  </section>
 </div>
