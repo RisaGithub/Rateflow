@@ -15,8 +15,9 @@ class AdminController < ApplicationController
     @logs = FetchLog.recent.limit(20)
   end
 
-  # Rates for the last 14 days from every provider (also re-snapshots the
-  # internal forecast inside RatesFetcher).
+  # Rates for the last 14 days from the three API providers (also re-snapshots
+  # the internal forecast inside RatesFetcher). АПЭКОН's quote is saved by the
+  # forecasts button — same page, no extra visit to the site.
   def refresh_rates
     written = RatesFetcher.new.call
     redirect_to admin_path, notice: "Курсы обновлены: записано #{written} строк."
@@ -33,7 +34,8 @@ class AdminController < ApplicationController
   def refresh_forecasts
     result = ForecastsFetcher.new.call
     notice = case result[:status]
-    when "ok" then "Прогноз АПЭКОН по #{result[:currency]} обновлён: #{result[:points]} точек."
+    when "ok" then "Прогноз АПЭКОН по #{result[:currency]} обновлён: #{result[:points]} точек" \
+                   "#{", котировка сохранена" if result[:quote_rows].to_i.positive?}."
     when "fresh" then "Все прогнозы АПЭКОН свежие (моложе суток) — обновлять нечего."
     else "Прогноз по #{result[:currency]} не обновился: #{result[:error]}"
     end

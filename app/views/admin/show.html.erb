@@ -49,7 +49,7 @@
     <div class="actions">
       <%= form_with url: admin_refresh_rates_path do |f| %>
         <%= f.submit "Обновить курсы", class: "btn", data: { turbo_submits_with: "Обновляем…" } %>
-        <span class="panel__note">14 дней, все провайдеры (АПЭКОН — с паузой 10 с на валюту)</span>
+        <span class="panel__note">14 дней, три API-провайдера — быстро, без пауз АПЭКОН</span>
       <% end %>
       <%= form_with url: admin_backfill_year_path do |f| %>
         <%= f.submit "Догрузить год истории", class: "btn", data: { turbo_submits_with: "Догружаем…" } %>
@@ -57,7 +57,7 @@
       <% end %>
       <%= form_with url: admin_refresh_forecasts_path do |f| %>
         <%= f.submit "Обновить прогнозы", class: "btn", data: { turbo_submits_with: "Обновляем…" } %>
-        <span class="panel__note">одна валюта АПЭКОН — та, у которой снимок самый старый</span>
+        <span class="panel__note">одна валюта АПЭКОН, самый старый снимок; котировка сохраняется тем же запросом</span>
       <% end %>
       <%= form_with url: admin_rebuild_internal_path do |f| %>
         <%= f.submit "Пересчитать прогноз Rateflow", class: "btn", data: { turbo_submits_with: "Считаем…" } %>

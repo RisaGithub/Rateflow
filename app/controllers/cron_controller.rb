@@ -6,8 +6,10 @@ class CronController < ApplicationController
 
   before_action :authenticate!
 
-  # GET /cron/refresh?token=… — rates for the last 14 days from all four
+  # GET /cron/refresh?token=… — rates for the last 14 days from the three API
   # providers (plus the internal forecast re-snapshot inside RatesFetcher).
+  # АПЭКОН is not called here: its crawl delay is too slow for this endpoint,
+  # and its quote arrives with /cron/forecasts instead.
   def refresh
     return render_skipped("rates") if recently_ran?("rates")
 
@@ -17,7 +19,8 @@ class CronController < ApplicationController
   end
 
   # GET /cron/forecasts?token=… — one АПЭКОН currency per call (the stalest;
-  # the site's 10-second crawl delay makes all four too slow for one request)
+  # the site's 10-second crawl delay makes all four too slow for one request).
+  # The same page load also yields today's АПЭКОН quote, stored into rates,
   # plus the cheap internal forecast for every currency.
   def forecasts
     return render_skipped("forecast") if recently_ran?("forecast")

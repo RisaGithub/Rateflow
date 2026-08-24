@@ -1,15 +1,20 @@
-# Pulls rates for every currency from all four providers on every run.
+# Pulls rates for every currency from the three API providers on every run.
 #
 # The providers are equals: each one is asked every time, each attempt is
 # recorded in FetchLog (one entry per provider per run), and each provider's
 # rows are stored under its own key. One provider failing never stops the
 # others. Rows are upserted, so re-running is idempotent.
+#
+# АПЭКОН is deliberately not here: its 10-second crawl delay per currency
+# would stretch the request by half a minute, and its quote adds nothing over
+# CBR. The apecon quote is stored by ForecastsFetcher instead, riding on the
+# same page load as the forecast.
 class RatesFetcher
   def initialize(days: 14, currencies: Rate::CURRENCIES, providers: nil)
     @from = days.days.ago.to_date
     @to = Date.current
     @currencies = currencies
-    @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new, Providers::Apecon.new ]
+    @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new ]
   end
 
   # Returns total number of rows written.

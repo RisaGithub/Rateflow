@@ -13,7 +13,7 @@ Ruby 3.4 · Rails 8.1 · PostgreSQL · Hotwire (Turbo + Stimulus) via importmap 
 ```sh
 bundle install
 bin/rails db:create db:migrate
-bundle exec rake rates:fetch          # recent data from all four providers (~40 s: АПЭКОН enforces a 10 s crawl delay)
+bundle exec rake rates:fetch          # recent data from the three API providers (seconds; АПЭКОН rides with forecasts)
 bundle exec rake rates:backfill       # optional: full archive since 1999 (~5 min)
 bin/rails server                      # http://localhost:3000
 ```
@@ -33,7 +33,7 @@ Tests: `bin/rails test` (no network — provider responses are stubbed with save
 
 ## Data sources
 
-All four providers are equals: every run polls each of them, every attempt is logged, and each provider's rows are stored under its own key. One provider failing never stops the others.
+The three API providers are polled together on every rates run; АПЭКОН's quote is saved by the forecast fetch, from the same page load (its 10 s crawl delay is too slow for the rates endpoint). Every attempt is logged, each provider's rows are stored under its own key, and one provider failing never stops the others.
 
 | Provider | History | Endpoint | Notes |
 |---|---|---|---|
@@ -62,8 +62,8 @@ The chart draws either or both as dashed lines over the facts (АПЭКОН gets
 Plain GET with a shared token, because many free schedulers can only GET:
 
 ```
-GET /cron/refresh?token=...     # rates: all four providers, last 14 days
-GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stalest) + internal for all
+GET /cron/refresh?token=...     # rates: the three API providers, last 14 days (seconds, no apecon.ru visits)
+GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stalest, quote saved too) + internal for all
 ```
 
 - Token from `ENV["CRON_TOKEN"]`, compared with `secure_compare`. No token configured → 503; wrong token → 401.

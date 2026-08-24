@@ -1,5 +1,7 @@
 # Pulls one АПЭКОН forecast snapshot per call and stores it via
-# ForecastRun.store (which dedups identical snapshots).
+# ForecastRun.store (which dedups identical snapshots). Today's quote sits on
+# the same page, so it is saved into rates as well — one HTTP request feeds
+# both tables (АПЭКОН is excluded from RatesFetcher for exactly this reason).
 #
 # АПЭКОН is slow by design — robots.txt demands a 10-second pause between
 # requests, so refreshing all currencies at once would hold a web request for
@@ -25,8 +27,10 @@ class ForecastsFetcher
     result = @provider.fetch_forecast(currency)
     run = ForecastRun.store(provider: @provider.key, currency: currency,
                             points: result.points, source_url: result.source_url)
+    quote_rows = store_quote(currency)
     log(started, ok: true, status: result.http_status, count: result.points.size)
-    { status: "ok", currency: currency, points: run.points_count, captured_at: run.captured_at }
+    { status: "ok", currency: currency, points: run.points_count,
+      quote_rows: quote_rows, captured_at: run.captured_at }
   rescue Providers::Error => e
     log(started, ok: false, status: e.http_status, error: e.message)
     { status: "error", currency: currency, error: e.message }
@@ -36,6 +40,15 @@ class ForecastsFetcher
   end
 
   private
+
+  # The provider caches the page it just loaded for the forecast, so grabbing
+  # the quote costs no extra request. A page without a recognizable quote
+  # simply contributes nothing — the forecast still counts as a success.
+  def store_quote(currency)
+    Rate.store(@provider.fetch([ currency ]).records, @provider.key)
+  rescue Providers::Error
+    0
+  end
 
   # The currency with the oldest snapshot; never-fetched currencies win
   # outright, and one refreshed less than MIN_AGE ago is not due at all.

@@ -51,8 +51,9 @@ module Providers
     def fetch(currencies, from: nil, to: nil)
       records, status, error = [], nil, nil
       currencies.each do |currency|
-        body, status = page(currency)
-        records << parse_quote(body, currency)
+        page = fetch_page(currency)
+        status = page[:http_status]
+        records << demand(page[:quote])
       rescue Error => e
         error = e
       end
@@ -66,20 +67,39 @@ module Providers
     # day of the forecast month. Fewer than two recognized rows means the
     # markup changed — that is a provider error, not a partial success.
     def fetch_forecast(currency)
-      url = PAGES.fetch(currency) { raise Error, "Unknown currency #{currency}" }
-      body, status = get(url)
-      points = parse_forecast(body)
+      page = fetch_page(currency)
+      points = demand(page[:forecast])
       raise Error, "Monthly forecast table not recognized" if points.size < 2
 
-      ForecastResult.new(points: points, source_url: url, http_status: status)
+      ForecastResult.new(points: points, source_url: page[:url], http_status: page[:http_status])
     end
 
     private
 
-    def page(currency)
-      url = PAGES.fetch(currency) { raise Error, "Unknown currency #{currency}" }
-      get(url)
+    # The quote and the forecast live on the same page, so one instance loads
+    # each currency's HTML exactly once (one crawl-delay pause) and both fetch
+    # and fetch_forecast read from the cached parse. Each half is parsed
+    # independently: a page with a broken quote can still serve its forecast.
+    # Failed page loads are not cached — a retry gets a fresh request.
+    def fetch_page(currency)
+      (@pages ||= {})[currency] ||= begin
+        url = PAGES.fetch(currency) { raise Error, "Unknown currency #{currency}" }
+        body, status = get(url)
+        { quote: attempt_parse { parse_quote(body, currency) },
+          forecast: attempt_parse { parse_forecast(body) },
+          url: url, http_status: status }
+      end
     end
+
+    # The parsed value, or the captured Error when that half of the page
+    # did not parse — the caller raises only for the half it actually needs.
+    def attempt_parse
+      yield
+    rescue Error => e
+      e
+    end
+
+    def demand(part) = part.is_a?(Error) ? raise(part) : part
 
     # Base#get plus the mandatory pause between any two requests to the site.
     def get(url)

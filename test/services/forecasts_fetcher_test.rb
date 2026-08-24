@@ -2,11 +2,13 @@ require "test_helper"
 
 class ForecastsFetcherTest < ActiveSupport::TestCase
   # Stand-in for the АПЭКОН provider: canned points or a canned failure.
+  # Like the real one, it serves the quote from the already-loaded page.
   class FakeProvider
     attr_reader :fetched
 
-    def initialize(error: nil)
+    def initialize(error: nil, quote_error: nil)
       @error = error
+      @quote_error = quote_error
       @fetched = []
     end
 
@@ -24,6 +26,13 @@ class ForecastsFetcherTest < ActiveSupport::TestCase
         source_url: "https://apecon.ru/", http_status: 200
       )
     end
+
+    def fetch(currencies, from: nil, to: nil)
+      raise @quote_error if @quote_error
+
+      records = currencies.map { |c| { currency: c, on_date: Date.current, value: BigDecimal("82.5") } }
+      Providers::Result.new(records: records, http_status: 200)
+    end
   end
 
   def store(currency, captured_at)
@@ -40,6 +49,25 @@ class ForecastsFetcherTest < ActiveSupport::TestCase
 
     assert_equal "ok", result[:status]
     assert_equal %w[EUR], provider.fetched
+    assert FetchLog.for_kind("forecast").succeeded.exists?
+  end
+
+  test "the same call stores the page's quote into rates under apecon" do
+    result = ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[USD]).call
+
+    assert_equal 1, result[:quote_rows]
+    rate = Rate.find_by(provider: "apecon", currency: "USD", on_date: Date.current)
+    assert_equal BigDecimal("82.5"), rate.value
+  end
+
+  test "a page without a recognizable quote still counts as a forecast success" do
+    provider = FakeProvider.new(quote_error: Providers::Error.new("Quote not found"))
+
+    result = ForecastsFetcher.new(provider: provider, currencies: %w[USD]).call
+
+    assert_equal "ok", result[:status]
+    assert_equal 0, result[:quote_rows]
+    assert_not Rate.where(provider: "apecon").exists?
     assert FetchLog.for_kind("forecast").succeeded.exists?
   end
 

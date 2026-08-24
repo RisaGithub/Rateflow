@@ -9,7 +9,12 @@ module Providers
     class Stubbed < Apecon
       def self.key = "apecon"
 
-      private def get(_url) = [ File.binread(FIXTURE), 200 ]
+      def requests = @requests.to_i
+
+      private def get(_url)
+        @requests = requests + 1
+        [ File.binread(FIXTURE), 200 ]
+      end
     end
 
     # A page whose markup no longer holds the expected tables.
@@ -45,6 +50,17 @@ module Providers
       # Second table continues 2028 («2028 продолжение») — no month is lost.
       assert_equal Date.new(2030, 9, 1), result.points.last[:horizon_date]
       assert_equal result.points.size, result.points.map { |p| p[:horizon_date] }.uniq.size
+    end
+
+    test "forecast and quote share a single page load per instance" do
+      provider = Stubbed.new
+
+      forecast = provider.fetch_forecast("USD")
+      quote = provider.fetch(%w[USD])
+
+      assert_equal 1, provider.requests # the second call reads the cached page
+      assert_equal 50, forecast.points.size
+      assert_equal BigDecimal("83.29"), quote.records.first[:value]
     end
 
     test "unrecognized markup raises Providers::Error, not a bare exception" do

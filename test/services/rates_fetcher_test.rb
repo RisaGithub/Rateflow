@@ -50,6 +50,12 @@ class RatesFetcherTest < ActiveSupport::TestCase
     assert_equal "HTTP 500", logs.first.error_message
   end
 
+  test "the default provider list leaves apecon out — its quote rides with the forecast fetch" do
+    providers = RatesFetcher.new.instance_variable_get(:@providers)
+
+    assert_equal %w[cbr erapi currencyapi], providers.map(&:key)
+  end
+
   test "re-running writes no duplicate rows" do
     providers = [ FakeProvider.new("cbr", records: [ record ]) ]
 
