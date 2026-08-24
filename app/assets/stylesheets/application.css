@@ -482,6 +482,12 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 .pager__link { padding: 4px 8px; border-radius: var(--radius); color: var(--text-2); }
 .pager__link:hover { background: var(--hover); color: var(--text); }
 .pager__info { margin: 0 auto; }
+/* The forecasts page pages client-side, so its pager entries are buttons. */
+button.pager__link { border: 0; background: none; cursor: pointer; }
+
+/* Snapshot table: a row click puts that version on the main chart. */
+.snapshots tr[data-run-id] { cursor: pointer; }
+.snapshots tr.is-selected td { background: var(--accent-soft); }
 
 /* ---------- Footer ---------- */
 

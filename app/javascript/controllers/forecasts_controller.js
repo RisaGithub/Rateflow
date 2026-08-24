@@ -5,10 +5,12 @@ const SOURCE_NAMES = { apecon: "АПЭКОН", internal: "Rateflow" }
 // Facts cover the backtest span, so matured forecast horizons meet their CBR line.
 const FACT_DAYS = 730
 const FAN_MAX = 60 // more translucent lines than this is mud, not a fan
+const PAGE_SIZE = 50 // snapshot table rows per page, same as the sources log
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
 const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
 const dateShort = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7)
+const dateTimeRu = (iso) => `${dateRu(iso.slice(0, 10))} ${iso.slice(11, 16)}`
 const isoDaysAgo = (days) => {
   const d = new Date()
   d.setDate(d.getDate() - days)
@@ -32,11 +34,15 @@ export default class extends Controller {
   static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
                     "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
                     "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus",
-                    "accuracyGroup", "accuracyCard"]
+                    "accuracyGroup", "accuracyCard",
+                    "snapshotsBody", "pagerPrev", "pagerNext", "pagerInfo"]
 
   connect() {
     this.state = { currency: "USD", source: "both", horizonDate: null }
     this.runIndex = null
+    this.pinned = {} // exact table-picked snapshots by provider
+    this.selectedRunId = null
+    this.page = 1
     this.charts = {}
     this.facts = []
     this.payload = null
@@ -59,12 +65,54 @@ export default class extends Controller {
     const { key, value } = event.currentTarget.dataset
     this.state[key] = value
     this.resetPlayback()
+    this.page = 1
     key === "currency" ? this.load() : this.render()
   }
 
   setHorizon(event) {
     this.state.horizonDate = event.target.value
     this.renderRevision()
+  }
+
+  // A table row puts that exact version on the main chart. When the snapshot
+  // survives in the thinned payload, the playback slider jumps right to it;
+  // a thinned-out one is fetched individually and pinned.
+  async selectSnapshot(event) {
+    const { runId, provider } = event.currentTarget.dataset
+    const id = Number(runId)
+    this.stopPlay()
+    this.selectedRunId = id
+
+    const position = this.runs(provider).findIndex((r) => r.id === id)
+    if (position >= 0 && provider === this.playbackProvider()) {
+      this.runIndex = position
+      delete this.pinned[provider]
+    } else if (position >= 0) {
+      this.pinned[provider] = this.runs(provider)[position]
+    } else {
+      try {
+        this.pinned[provider] = await this.fetchJson(`/forecasts/data?run=${id}`)
+      } catch (error) {
+        if (error.name === "AbortError") return
+        this.mainStatusTarget.innerHTML = `<span>Не удалось загрузить снимок</span>`
+        return
+      }
+      if (provider === this.playbackProvider()) this.runIndex = null
+    }
+    this.renderMain()
+    this.renderPlayback()
+    this.renderMainStatus()
+    this.renderSnapshots()
+  }
+
+  prevPage() {
+    this.page = Math.max(1, this.page - 1)
+    this.renderSnapshots()
+  }
+
+  nextPage() {
+    this.page += 1
+    this.renderSnapshots()
   }
 
   // ----- data -----
@@ -105,12 +153,14 @@ export default class extends Controller {
     return this.payload?.series?.[provider]?.index || []
   }
 
-  // The snapshot on the main chart — the latest one until playback says otherwise.
+  // The snapshot on the main chart: playback position first, then a snapshot
+  // pinned from the table, the latest one otherwise.
   activeRun(provider) {
     const runs = this.runs(provider)
-    if (!runs.length) return null
-    if (provider === this.playbackProvider() && this.runIndex != null) return runs[Math.min(this.runIndex, runs.length - 1)]
-    return runs.at(-1)
+    if (provider === this.playbackProvider() && this.runIndex != null && runs.length) {
+      return runs[Math.min(this.runIndex, runs.length - 1)]
+    }
+    return this.pinned[provider] || runs.at(-1) || null
   }
 
   colorOf(provider) {
@@ -129,6 +179,8 @@ export default class extends Controller {
   resetPlayback() {
     this.stopPlay()
     this.runIndex = null
+    this.pinned = {}
+    this.selectedRunId = null
   }
 
   scrub(event) {
@@ -192,6 +244,32 @@ export default class extends Controller {
     this.renderFan()
     this.renderRevision()
     this.renderAccuracy()
+    this.renderSnapshots()
+  }
+
+  // Block 5: the complete snapshot log from the metadata index — every stored
+  // version, not just the thinned hundred the charts draw.
+  renderSnapshots() {
+    const rows = this.sources().flatMap((p) => this.index(p).map((r) => ({ ...r, provider: p })))
+    rows.sort((a, b) => (a.captured_at < b.captured_at ? 1 : -1))
+
+    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+    this.page = Math.min(this.page, pages)
+    const visible = rows.slice((this.page - 1) * PAGE_SIZE, this.page * PAGE_SIZE)
+
+    this.snapshotsBodyTarget.innerHTML = visible.length ? visible.map((r) => `
+      <tr data-run-id="${r.id}" data-provider="${r.provider}" data-action="click->forecasts#selectSnapshot"
+          class="${r.id === this.selectedRunId ? "is-selected" : ""}">
+        <td>${dateTimeRu(r.captured_at)}</td>
+        <td class="muted">${SOURCE_NAMES[r.provider]}</td>
+        <td class="num">${r.points_count}</td>
+        <td>${r.horizon_to ? dateRu(r.horizon_to) : "—"}</td>
+      </tr>`).join("")
+      : `<tr><td colspan="4" class="table-empty">Снимков для ${this.state.currency} пока нет</td></tr>`
+
+    this.pagerPrevTarget.hidden = this.page <= 1
+    this.pagerNextTarget.hidden = this.page >= pages
+    this.pagerInfoTarget.textContent = `Страница ${this.page} из ${pages} · ${rows.length} снимков`
   }
 
   // Block 4 is server-rendered per currency; the switches only pick what shows.
@@ -420,8 +498,9 @@ export default class extends Controller {
     const parts = this.sources().flatMap((provider) => {
       const run = this.activeRun(provider)
       if (!run) return [`${FORECAST_NAMES[provider]}: снимков для ${this.state.currency} пока нет`]
-      const version = this.runs(provider).indexOf(run) + 1
-      return [`${FORECAST_NAMES[provider]}: снимок от ${dateRu(run.captured_at.slice(0, 10))} (${version} из ${this.runs(provider).length}) · ${run.points.length} тчк · до ${dateRu(run.points.at(-1)[0])}`]
+      const position = this.runs(provider).indexOf(run)
+      const version = position >= 0 ? ` (${position + 1} из ${this.runs(provider).length})` : " (выбран в таблице)"
+      return [`${FORECAST_NAMES[provider]}: снимок от ${dateRu(run.captured_at.slice(0, 10))}${version} · ${run.points.length} тчк · до ${dateRu(run.points.at(-1)[0])}`]
     })
     parts.push("не является инвестиционной рекомендацией")
     this.mainStatusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")

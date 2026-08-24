@@ -67,4 +67,24 @@
   </section>
 
   <%= render "accuracy", accuracy: @accuracy %>
+
+  <section class="section">
+    <div class="section__head">
+      <%= render "shared/icon", name: "table" %>
+      <h2 class="section__title">Снимки прогнозов</h2>
+    </div>
+    <div class="card table-wrap snapshots">
+      <table>
+        <thead>
+          <tr><th>Дата и время снимка</th><th>Провайдер</th><th class="num">Точек</th><th>Дальний горизонт</th></tr>
+        </thead>
+        <tbody data-forecasts-target="snapshotsBody"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <button type="button" class="pager__link" data-forecasts-target="pagerPrev" data-action="forecasts#prevPage" hidden>← Новее</button>
+      <span class="pager__info" data-forecasts-target="pagerInfo"></span>
+      <button type="button" class="pager__link" data-forecasts-target="pagerNext" data-action="forecasts#nextPage" hidden>Старше →</button>
+    </div>
+  </section>
 </div>
