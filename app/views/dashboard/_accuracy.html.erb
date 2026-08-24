@@ -1,13 +1,19 @@
-<%# Matured-forecast scoring per provider. No invented numbers: until a
-    forecast point has actually come true, the card says so in plain words.
-    The two providers are measured differently — АПЭКОН by its actually
-    published forecasts, our own model by a historical backtest — and each
-    card names its method so the numbers are never silently mixed. %>
+<%# Matured-forecast scoring per provider, horizon buckets only. Deliberately
+    no headline MAE/MAPE per provider: our model forecasts 7 days ahead,
+    АПЭКОН — years, so a single number would grade incomparably hard tasks
+    with one scale. No invented numbers: until a forecast point has actually
+    come true, the card says so in plain words. The two providers are measured
+    differently — АПЭКОН by its actually published forecasts, our own model by
+    a historical backtest — and each card names its method so the numbers are
+    never silently mixed. %>
+<% comparable = reports.map { |r| r.buckets.filter_map { |label, bucket| label if bucket[:samples].positive? } }.reduce(:&) %>
 <section class="section">
   <div class="section__head">
     <%= render "shared/icon", name: "target" %>
     <h2 class="section__title">Точность прогнозов</h2>
   </div>
+  <p class="panel__note">Подсвечены корзины, где сбывшиеся точки есть у обоих провайдеров: чем дальше горизонт,
+    тем больше ошибка у любой модели, поэтому числа из разных корзин между собой не сравниваются.</p>
   <div class="providers">
     <% reports.each do |report| %>
       <div class="card provider">
@@ -23,29 +29,15 @@
           <p class="panel__note">Пока нечего сравнивать: ни одна точка этого прогноза ещё не сбылась.
             Оценка появится, когда даты прогноза наступят и будет фактический курс ЦБ РФ.</p>
         <% else %>
-          <div class="stats">
-            <div>
-              <div class="stat__label">Сравнений</div>
-              <div class="stat__value"><%= report.samples %></div>
-            </div>
-            <div>
-              <div class="stat__label">MAE, ₽</div>
-              <div class="stat__value"><%= rub(report.mae, precision: 2) %></div>
-            </div>
-            <div>
-              <div class="stat__label">MAPE</div>
-              <div class="stat__value"><%= rub(report.mape, precision: 2) %>%</div>
-            </div>
-          </div>
           <table class="accuracy-table">
             <thead>
               <tr><th>Горизонт прогноза</th><th class="num">Сравнений</th><th class="num">MAE, ₽</th><th class="num">MAPE</th></tr>
             </thead>
             <tbody>
               <% report.buckets.each do |label, bucket| %>
-                <tr>
+                <tr class="<%= comparable.include?(label) ? "is-comparable" : "is-dim" %>">
                   <td class="muted">за <%= label %></td>
-                  <td class="num"><%= bucket[:samples] %></td>
+                  <td class="num"><%= bucket[:samples].zero? ? "—" : bucket[:samples] %></td>
                   <td class="num"><%= bucket[:samples].zero? ? "—" : rub(bucket[:mae], precision: 2) %></td>
                   <td class="num"><%= bucket[:samples].zero? ? "—" : "#{rub(bucket[:mape], precision: 2)}%" %></td>
                 </tr>

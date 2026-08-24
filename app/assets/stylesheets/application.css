@@ -458,6 +458,11 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
   font-weight: 500;
 }
 
+/* Accuracy buckets: only rows where both providers have matured points are
+   cross-comparable — those get the accent tint, the rest step back. */
+.accuracy-table tr.is-comparable td { background: var(--accent-soft); }
+.accuracy-table tr.is-dim td { color: var(--text-3); }
+
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .filters .select { width: auto; height: 30px; font-size: 12px; }
 
