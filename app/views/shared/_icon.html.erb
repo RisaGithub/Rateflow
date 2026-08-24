@@ -11,6 +11,7 @@
   "log"      => '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>',
   "up"       => '<path d="M6 15l6-6 6 6"/>',
   "down"     => '<path d="M6 9l6 6 6-6"/>',
-  "filter"   => '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>'
+  "filter"   => '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>',
+  "target"   => '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'
 } %>
 <svg class="icon <%= local_assigns[:class] %>" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><%= paths.fetch(name).html_safe %></svg>
