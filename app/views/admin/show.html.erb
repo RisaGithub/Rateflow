@@ -1,0 +1,104 @@
+<% content_for :title, "Rateflow · Админка" %>
+
+<div>
+  <h1 class="page-title">Админка</h1>
+  <p class="page-sub">Состояние базы и ручное обновление данных<%= " · обновлено #{l(@last_update, format: :short_ru)}" if @last_update %></p>
+</div>
+
+<section class="section">
+  <div class="section__head">
+    <%= render "shared/icon", name: "source" %>
+    <h2 class="section__title">Состояние базы</h2>
+  </div>
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr><th>Провайдер</th><th class="num">Строк в rates</th><th>С даты</th><th>По дату</th><th class="num">Снимков прогноза</th><th>Последний снимок</th></tr>
+      </thead>
+      <tbody>
+        <% Rate::PROVIDERS.each do |provider| %>
+          <% rates = @rate_stats[provider] %>
+          <tr>
+            <td><%= provider_name(provider) %></td>
+            <td class="num"><%= rates ? rates[:count] : 0 %></td>
+            <td class="muted"><%= rates ? date_ru(rates[:from]) : "—" %></td>
+            <td class="muted"><%= rates ? date_ru(rates[:to]) : "—" %></td>
+            <td class="num"><%= provider == "apecon" ? @forecast_stats.dig(provider, :count).to_i : "—" %></td>
+            <td class="muted"><%= provider == "apecon" && @forecast_stats.dig(provider, :last) ? l(@forecast_stats[provider][:last], format: :short_ru) : "—" %></td>
+          </tr>
+        <% end %>
+        <tr>
+          <td><%= provider_name("internal") %></td>
+          <td class="num muted">—</td>
+          <td class="muted">—</td>
+          <td class="muted">—</td>
+          <td class="num"><%= @forecast_stats.dig("internal", :count).to_i %></td>
+          <td class="muted"><%= @forecast_stats.dig("internal", :last) ? l(@forecast_stats["internal"][:last], format: :short_ru) : "—" %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section__head">
+    <%= render "shared/icon", name: "trend" %>
+    <h2 class="section__title">Действия</h2>
+  </div>
+  <div class="card panel">
+    <div class="actions">
+      <%= form_with url: admin_refresh_rates_path do |f| %>
+        <%= f.submit "Обновить курсы", class: "btn", data: { turbo_submits_with: "Обновляем…" } %>
+        <span class="panel__note">14 дней, все провайдеры (АПЭКОН — с паузой 10 с на валюту)</span>
+      <% end %>
+      <%= form_with url: admin_backfill_year_path do |f| %>
+        <%= f.submit "Догрузить год истории", class: "btn", data: { turbo_submits_with: "Догружаем…" } %>
+        <span class="panel__note">ЦБ РФ отдаёт год одним запросом на валюту</span>
+      <% end %>
+      <%= form_with url: admin_refresh_forecasts_path do |f| %>
+        <%= f.submit "Обновить прогнозы", class: "btn", data: { turbo_submits_with: "Обновляем…" } %>
+        <span class="panel__note">одна валюта АПЭКОН — та, у которой снимок самый старый</span>
+      <% end %>
+      <%= form_with url: admin_rebuild_internal_path do |f| %>
+        <%= f.submit "Пересчитать собственный прогноз", class: "btn", data: { turbo_submits_with: "Считаем…" } %>
+        <span class="panel__note">скользящее среднее по всем валютам, без сети</span>
+      <% end %>
+    </div>
+    <p class="panel__note">Полная заливка архива с 1999 года слишком долгая для веб-запроса —
+      запускается на сервере командой <code class="mono">bin/rails "rates:backfill[1999-01-01]"</code>.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section__head">
+    <%= render "shared/icon", name: "log" %>
+    <h2 class="section__title">Последние 20 записей журнала</h2>
+  </div>
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Время</th><th>Провайдер</th><th>Тип</th><th>Статус</th>
+          <th class="num">HTTP</th><th class="num">Время, мс</th><th class="num">Записей</th><th>Ошибка</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if @logs.empty? %>
+          <tr><td colspan="8" class="table-empty">Записей нет</td></tr>
+        <% end %>
+        <% @logs.each do |log| %>
+          <tr>
+            <td><%= l(log.created_at, format: :short_ru) %></td>
+            <td><%= provider_name(log.provider) %></td>
+            <td class="muted"><%= log.kind == "forecast" ? "прогноз" : "курсы" %></td>
+            <td><span class="pill <%= log.ok? ? 'pill--ok' : 'pill--fail' %>"><%= log.ok? ? "Успех" : "Ошибка" %></span></td>
+            <td class="num muted"><%= log.http_status || "—" %></td>
+            <td class="num"><%= log.duration_ms %></td>
+            <td class="num"><%= log.records_count %></td>
+            <td class="wrap"><%= log.error_message.presence || "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -371,6 +371,36 @@ td.muted { color: var(--text-3); }
 td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--text-2); font-size: 12px; }
 .table-empty { padding: 24px; color: var(--text-3); text-align: center; }
 
+/* ---------- Admin ---------- */
+
+.flash {
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--up) 35%, transparent);
+  border-radius: var(--radius);
+  background: var(--up-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+.flash--alert { border-color: color-mix(in srgb, var(--down) 35%, transparent); background: var(--down-soft); }
+
+.actions { display: grid; gap: 12px; }
+.actions form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.btn {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn[disabled] { opacity: 0.6; cursor: progress; }
+
 /* ---------- Pills ---------- */
 
 .pill {
