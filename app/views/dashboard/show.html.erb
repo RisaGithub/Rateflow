@@ -29,6 +29,8 @@
           <label class="control__label" for="range-to">по</label>
           <input id="range-to" type="date" class="input input--date" data-dashboard-target="toDate" data-action="change->dashboard#setRange">
         </div>
+        <%= render "segment", key: "forecast", label: "Прогноз",
+                   options: [["apecon", "АПЭКОН"], ["internal", "Свой"], ["both", "Оба"]] %>
         <div class="control">
           <span class="control__label">Источники</span>
           <div class="chips" role="group" aria-label="Источники">
@@ -47,6 +49,7 @@
     <div class="card chart-card">
       <div class="chart-wrap"><canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas></div>
       <div class="legend" data-dashboard-target="legend"></div>
+      <div class="status-line" data-dashboard-target="forecastMeta"></div>
       <div class="status-line" data-dashboard-target="diverge"></div>
       <div class="status-line" data-dashboard-target="status"></div>
     </div>
