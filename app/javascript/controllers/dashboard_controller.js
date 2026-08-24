@@ -20,7 +20,8 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 // the needed series from GET /series.
 export default class extends Controller {
   static targets = ["card", "seg", "canvas", "legend", "status", "diverge", "tbody", "trend",
-                    "range", "fromDate", "toDate", "sourceBox", "forecastMeta"]
+                    "range", "fromDate", "toDate", "sourceBox", "forecastMeta",
+                    "playback", "playBtn", "playSlider", "playLabel"]
   static values = { initial: Object }
 
   connect() {
@@ -38,6 +39,7 @@ export default class extends Controller {
 
   disconnect() {
     window.removeEventListener("theme:change", this.onTheme)
+    this.stopPlay()
     this.abortController?.abort()
     this.forecastAbort?.abort()
     this.chart?.destroy()
@@ -56,7 +58,11 @@ export default class extends Controller {
     const num = Number(value)
     this.state[key] = Number.isNaN(num) ? value : num
 
-    if (key === "rows" || key === "tableSource" || key === "forecast") return this.render()
+    if (key === "forecast") {
+      this.resetPlayback()
+      return this.render()
+    }
+    if (key === "rows" || key === "tableSource") return this.render()
     if (key === "period") {
       this.rangeTarget.hidden = this.state.period !== "custom"
       // A custom range only makes sense once at least the start date is set.
@@ -144,15 +150,77 @@ export default class extends Controller {
     }
   }
 
-  resetPlayback() {}
-
   runs(provider) {
     return this.forecastPayload?.series?.[provider]?.runs || []
   }
 
   // The snapshot currently on the chart — the latest one until playback says otherwise.
   activeRun(provider) {
-    return this.runs(provider).at(-1) || null
+    const runs = this.runs(provider)
+    if (!runs.length) return null
+    if (provider === this.playbackProvider() && this.runIndex != null) return runs[Math.min(this.runIndex, runs.length - 1)]
+    return runs.at(-1)
+  }
+
+  // ----- playback of forecast versions -----
+
+  // The slider walks the snapshots of one provider; in "both" mode АПЭКОН is
+  // the one being scrubbed, the internal line stays at its latest version.
+  playbackProvider() {
+    return this.state.forecast === "internal" ? "internal" : "apecon"
+  }
+
+  resetPlayback() {
+    this.stopPlay()
+    this.runIndex = null
+  }
+
+  scrub(event) {
+    this.stopPlay()
+    this.runIndex = Number(event.target.value)
+    this.render()
+  }
+
+  togglePlay() {
+    this.playTimer ? this.stopPlay() : this.startPlay()
+    this.renderPlayback()
+  }
+
+  // Steps through versions in a loop, ~600 ms per snapshot.
+  startPlay() {
+    const total = this.runs(this.playbackProvider()).length
+    if (total < 2 || this.reducedMotion()) return
+    this.playTimer = setInterval(() => {
+      const runs = this.runs(this.playbackProvider())
+      this.runIndex = ((this.runIndex ?? runs.length - 1) + 1) % runs.length
+      this.render()
+    }, 600)
+  }
+
+  stopPlay() {
+    if (this.playTimer) clearInterval(this.playTimer)
+    this.playTimer = null
+  }
+
+  reducedMotion() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  }
+
+  renderPlayback() {
+    const runs = this.runs(this.playbackProvider())
+    this.playbackTarget.hidden = runs.length < 2
+    if (runs.length < 2) {
+      this.stopPlay()
+      return
+    }
+    const index = this.runIndex != null ? Math.min(this.runIndex, runs.length - 1) : runs.length - 1
+    this.playSliderTarget.max = runs.length - 1
+    this.playSliderTarget.value = index
+    this.playLabelTarget.textContent =
+      `${dateRu(runs[index].captured_at.slice(0, 10))} · версия ${index + 1} из ${runs.length}`
+    this.playBtnTarget.hidden = this.reducedMotion()
+    this.playBtnTarget.textContent = this.playTimer ? "⏸" : "▶"
+    this.playBtnTarget.setAttribute("aria-label", this.playTimer ? "Пауза" : "Проиграть историю прогноза")
   }
 
   forecastProviders() {
@@ -173,6 +241,7 @@ export default class extends Controller {
     this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
     this.sourceBoxTargets.forEach((b) => (b.checked = this.state.sources.includes(b.value)))
     this.renderChart()
+    this.renderPlayback()
     this.renderLegend()
     this.renderForecastMeta()
     this.renderDiverge()
@@ -376,7 +445,7 @@ export default class extends Controller {
     const options = {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 250 },
+      animation: { duration: this.reducedMotion() ? 0 : 250 },
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },
