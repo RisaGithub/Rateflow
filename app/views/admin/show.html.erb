@@ -66,8 +66,8 @@
     </div>
     <p class="panel__note">Полная заливка архива с 1999 года слишком долгая для веб-запроса —
       запускается на сервере командой <code class="mono">bin/rails "rates:backfill[1999-01-01]"</code>.
-      Исторический бэктест прогноза Rateflow (наполняет блок точности за 2 года, тоже долгий) —
-      <code class="mono">bin/rails forecasts:backtest</code>.</p>
+      Исторический бэктест прогноза Rateflow (по снимку на каждый день, наполняет блоки точности и пересмотров) —
+      <code class="mono">bin/rails "forecasts:backtest[180]"</code>.</p>
   </div>
 </section>
 

@@ -10,7 +10,7 @@ class InternalForecastBacktestTest < ActiveSupport::TestCase
 
   def backtest = InternalForecastBacktest.new(currencies: %w[USD]).call
 
-  test "replays weekly snapshots dated in the past, one run per grid Monday" do
+  test "replays one snapshot per day of the grid, dated in the past" do
     seed(days: 30)
 
     created = backtest
@@ -18,12 +18,25 @@ class InternalForecastBacktestTest < ActiveSupport::TestCase
 
     assert created.positive?
     assert_equal created, runs.count
-    assert runs.all? { |r| r.captured_at.monday? && r.captured_at < Time.current }
+    assert runs.all? { |r| r.captured_at <= Time.current }
     assert runs.all? { |r| r.points_count == InternalForecast::HORIZON }
+    # Daily step: consecutive snapshots are exactly one day apart.
+    dates = runs.map { |r| r.captured_at.to_date }
+    assert dates.each_cons(2).all? { |a, b| b - a == 1 }
     # A backtested run only looks ahead of its own capture date.
     runs.each do |run|
       assert_operator run.points.minimum(:horizon_date), :>, run.captured_at.to_date
     end
+  end
+
+  test "a wider step stays anchored to the calendar, not the run date" do
+    seed(days: 30)
+
+    InternalForecastBacktest.new(currencies: %w[USD], step: 7).call
+    runs = ForecastRun.where(provider: "internal", currency: "USD")
+
+    assert runs.any?
+    assert runs.all? { |r| r.captured_at.monday? }
   end
 
   test "each replay sees only the data known on its date — no peeking forward" do

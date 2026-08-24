@@ -1,21 +1,26 @@
 # Fills the accuracy block without waiting weeks for live forecasts to
-# mature: replays our own model over the past two years of CBR history. Every
+# mature: replays our own model day by day over past CBR history. Every
 # replay date sees only the rates that were known by then — no peeking
 # forward — and the result is stored as a regular forecast_run with
 # captured_at set to that date, so ForecastAccuracy scores it exactly like a
-# live snapshot. Backtested numbers measure the model on history, not real
-# published predictions — the UI says so next to the figures.
+# live snapshot. A daily grid over a 7-day horizon means every horizon date
+# collects a snapshot from each of the preceding days — the revision chart
+# and the 1–6 day accuracy buckets get real data. Backtested numbers measure
+# the model on history, not real published predictions — the UI says so next
+# to the figures.
 #
-# Idempotent: the replay grid is anchored to Mondays (stable no matter which
-# day the task runs on), and a run already stored for (currency, captured_at)
-# is skipped, so re-running never multiplies snapshots. Long — meant for the
-# rake task (forecasts:backtest), not a web request.
+# Idempotent: the replay grid is counted from a fixed calendar date (stable
+# no matter which day the task runs on), and a run already stored for
+# (currency, captured_at) is skipped, so re-running never multiplies
+# snapshots. Meant for the rake task (forecasts:backtest), not a web request.
 class InternalForecastBacktest
-  PERIOD = 2.years
-  STEP = 7 # days between replayed forecasts
+  DAYS = 180 # default replay depth
+  EPOCH = Date.new(2000, 1, 3) # a Monday; grid dates are counted from here
 
-  def initialize(currencies: Rate::CURRENCIES)
+  def initialize(currencies: Rate::CURRENCIES, from: DAYS.days.ago.to_date, step: 1)
     @currencies = currencies
+    @from = from
+    @step = step
     @model = InternalForecast.new
   end
 
@@ -34,9 +39,11 @@ class InternalForecastBacktest
     grid.count { |as_of| replay(currency, as_of, series) }
   end
 
-  # Every Monday of the last two years, oldest first.
+  # Every step-th day since EPOCH that falls between from and today, oldest
+  # first — anchored to the calendar, so tomorrow's run lands on the same grid.
   def grid
-    PERIOD.ago.to_date.beginning_of_week.step(Date.current, STEP)
+    start = @from + (EPOCH - @from).to_i % @step
+    start.step(Date.current, @step)
   end
 
   # Stores the forecast as it would have been made on as_of; false when there
