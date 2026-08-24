@@ -11,7 +11,8 @@ module Providers
     class NotFound < Error; end
 
     # `on: nil` fetches the latest snapshot; `on: date` a specific day.
-    def fetch(currencies, on: nil)
+    # The from/to range is accepted for interface parity but ignored.
+    def fetch(currencies, on: nil, from: nil, to: nil)
       version = on ? on.iso8601 : "latest"
       body, status = get_with_fallback(version, dated: !on.nil?)
       json = parse(body)

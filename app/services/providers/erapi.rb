@@ -4,7 +4,9 @@ module Providers
   class Erapi < Base
     ENDPOINT = "https://open.er-api.com/v6/latest/USD"
 
-    def fetch(currencies)
+    # The date range is accepted for interface parity but ignored: the API
+    # only ever serves today's snapshot.
+    def fetch(currencies, from: nil, to: nil)
       body, status = get(ENDPOINT)
       json = parse(body)
       rates = json.fetch("rates") { raise Error, "No rates in response" }

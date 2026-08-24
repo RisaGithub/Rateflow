@@ -3,8 +3,9 @@ class ProviderStatus
   WINDOW = 20
 
   INFO = {
-    "cbr"   => { name: "ЦБ РФ", role: "основной", url: "cbr.ru/scripts/XML_dynamic.asp" },
-    "erapi" => { name: "ER-API", role: "резервный", url: "open.er-api.com/v6/latest/USD" }
+    "cbr"         => { name: "ЦБ РФ", role: "история с 1999 года", url: "cbr.ru/scripts/XML_dynamic.asp" },
+    "erapi"       => { name: "ER-API", role: "только текущий день", url: "open.er-api.com/v6/latest/USD" },
+    "currencyapi" => { name: "Currency API", role: "срезы по датам", url: "cdn.jsdelivr.net/npm/@fawazahmed0/currency-api" }
   }.freeze
 
   attr_reader :key

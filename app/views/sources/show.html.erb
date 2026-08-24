@@ -53,7 +53,7 @@
     <h2 class="section__title">Журнал обращений</h2>
     <%= form_with url: sources_path, method: :get, class: "section__aside filters", data: { turbo_frame: "_top" } do |f| %>
       <%= render "shared/icon", name: "filter", class: "is-flat" %>
-      <%= f.select :provider, options_for_select([["Все провайдеры", ""], ["ЦБ РФ", "cbr"], ["ER-API", "erapi"]], @provider),
+      <%= f.select :provider, options_for_select([["Все провайдеры", ""]] + Rate::PROVIDERS.map { |p| [provider_name(p), p] }, @provider),
                    {}, class: "select", onchange: "this.form.requestSubmit()", "aria-label": "Провайдер" %>
       <%= f.select :status, options_for_select([["Любой статус", ""], ["Успех", "ok"], ["Ошибка", "fail"]], @status),
                    {}, class: "select", onchange: "this.form.requestSubmit()", "aria-label": "Статус" %>

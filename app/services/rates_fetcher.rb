@@ -1,24 +1,22 @@
-# Pulls rates for every currency and records every provider call in FetchLog.
+# Pulls rates for every currency from all three providers on every run.
 #
-# CBR is the primary source and is asked per currency for the whole date range.
-# ER-API is asked once per run (a single request covers all currencies) and plays
-# two roles: the fallback for any currency CBR failed to deliver, and a daily
-# reference snapshot so the dashboard can show how the two sources diverge.
-# Rows are upserted, so re-running is idempotent.
+# The providers are equals: each one is asked every time, each attempt is
+# recorded in FetchLog (one entry per provider per run), and each provider's
+# rows are stored under its own key. One provider failing never stops the
+# others. Rows are upserted, so re-running is idempotent.
 class RatesFetcher
-  def initialize(days: 90, currencies: Rate::CURRENCIES)
+  def initialize(days: 14, currencies: Rate::CURRENCIES, providers: nil)
     @from = days.days.ago.to_date
     @to = Date.current
     @currencies = currencies
+    @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new ]
   end
 
   # Returns total number of rows written.
   def call
-    cbr = Providers::Cbr.new
-    written = @currencies.sum { |c| store(attempt(cbr) { cbr.fetch(c, from: @from, to: @to) }, cbr.key) }
-
-    erapi = Providers::Erapi.new
-    written + store(attempt(erapi) { erapi.fetch(@currencies) }, erapi.key)
+    @providers.sum do |provider|
+      store(attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }, provider.key)
+    end
   end
 
   private
@@ -51,7 +49,7 @@ class RatesFetcher
     return 0 if records.empty?
 
     rows = records.map { |r| r.merge(provider: provider) }
-    Rate.upsert_all(rows, unique_by: %i[currency on_date provider])
+    Rate.upsert_all(rows, unique_by: %i[currency provider on_date], record_timestamps: true)
     rows.size
   end
 

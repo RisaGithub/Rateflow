@@ -1,5 +1,5 @@
 module ApplicationHelper
-  PROVIDER_NAMES = { "cbr" => "ЦБ РФ", "erapi" => "ER-API" }.freeze
+  PROVIDER_NAMES = { "cbr" => "ЦБ РФ", "erapi" => "ER-API", "currencyapi" => "Currency API" }.freeze
 
   def provider_name(key) = PROVIDER_NAMES.fetch(key, key)
 

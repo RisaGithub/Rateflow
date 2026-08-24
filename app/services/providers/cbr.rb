@@ -5,7 +5,25 @@ module Providers
     ENDPOINT = "https://www.cbr.ru/scripts/XML_dynamic.asp"
     IDS = { "USD" => "R01235", "EUR" => "R01239", "CNY" => "R01375", "GBP" => "R01035" }.freeze
 
-    def fetch(currency, from:, to:)
+    # One attempt covers every currency; a single failing currency does not
+    # sink the rest — the attempt only fails when nothing came back at all.
+    def fetch(currencies, from:, to:)
+      records, status, error = [], nil, nil
+      currencies.each do |currency|
+        result = fetch_currency(currency, from: from, to: to)
+        records.concat(result.records)
+        status = result.http_status
+      rescue Error => e
+        error = e
+      end
+      raise error if records.empty? && error
+
+      Result.new(records: records, http_status: status)
+    end
+
+    # One currency over an arbitrary date range — the endpoint happily serves
+    # a whole year in one request, which the backfill task relies on.
+    def fetch_currency(currency, from:, to:)
       id = IDS.fetch(currency) { raise Error, "Unknown currency #{currency}" }
       url = "#{ENDPOINT}?date_req1=#{fmt(from)}&date_req2=#{fmt(to)}&VAL_NM_RQ=#{id}"
       body, status = get(url)
