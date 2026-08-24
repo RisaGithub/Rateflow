@@ -57,6 +57,20 @@ class ForecastAccuracyTest < ActiveSupport::TestCase
     assert_equal 2, ForecastAccuracy.new.report("apecon").samples # без фильтра — обе валюты
   end
 
+  test "from option keeps only points that matured inside the period" do
+    fact(Date.new(2026, 6, 5), "100")
+    fact(Date.new(2026, 6, 10), "100")
+    snapshot(Date.new(2026, 6, 1), [
+      { horizon_date: Date.new(2026, 6, 5), value: BigDecimal("95"), low: nil, high: nil },
+      { horizon_date: Date.new(2026, 6, 10), value: BigDecimal("90"), low: nil, high: nil }
+    ])
+
+    report = ForecastAccuracy.new(from: Date.new(2026, 6, 8)).report("apecon")
+
+    assert_equal 1, report.samples
+    assert_in_delta 10.0, report.mae, 0.0001
+  end
+
   test "providers are scored separately" do
     fact(Date.new(2026, 6, 10), "100")
     snapshot(Date.new(2026, 6, 1),

@@ -1,13 +1,8 @@
 <%# Matured-forecast scoring per provider, horizon buckets only. Deliberately
     no headline MAE/MAPE per provider: our model forecasts 7 days ahead,
     АПЭКОН — years, so a single number would grade incomparably hard tasks
-    with one scale. No invented numbers: until a forecast point has actually
-    come true, the card says so in plain words. The two providers are measured
-    differently — АПЭКОН by its actually published forecasts, our own model by
-    a historical backtest — and each card names its method so the numbers are
-    never silently mixed.
-    accuracy: { "USD" => [Report, ...], ... } — one pre-rendered group per
-    currency, the page's shared switches pick which cards are visible. %>
+    with one scale. The groups live in _accuracy_groups so the period switch
+    can refetch them from GET /forecasts/accuracy without touching the shell. %>
 <section class="section">
   <div class="section__head">
     <%= render "shared/icon", name: "target" %>
@@ -15,42 +10,7 @@
   </div>
   <p class="panel__note">Подсвечены корзины, где сбывшиеся точки есть у обоих провайдеров: чем дальше горизонт,
     тем больше ошибка у любой модели, поэтому числа из разных корзин между собой не сравниваются.</p>
-  <% accuracy.each do |currency, reports| %>
-    <% comparable = reports.map { |r| r.buckets.filter_map { |label, bucket| label if bucket[:samples].positive? } }.reduce(:&) %>
-    <div class="providers" data-forecasts-target="accuracyGroup" data-currency="<%= currency %>"
-         <%= "hidden" unless currency == Rate::CURRENCIES.first %>>
-      <% reports.each do |report| %>
-        <div class="card provider" data-forecasts-target="accuracyCard" data-provider="<%= report.provider %>">
-          <div class="provider__head">
-            <div>
-              <h3 class="provider__name"><%= provider_name(report.provider) %> · <%= currency %></h3>
-              <div class="provider__url"><%= report.provider == "internal" ?
-                "бэктест: прогнозы пересчитаны по историческим данным и сверены с фактом ЦБ РФ" :
-                "фактически опубликованные прогнозы, сверенные с фактом ЦБ РФ" %></div>
-            </div>
-          </div>
-          <% if report.samples.zero? %>
-            <p class="panel__note">Пока нечего сравнивать: ни одна точка этого прогноза ещё не сбылась.
-              Оценка появится, когда даты прогноза наступят и будет фактический курс ЦБ РФ.</p>
-          <% else %>
-            <table class="accuracy-table">
-              <thead>
-                <tr><th>Горизонт прогноза</th><th class="num">Сравнений</th><th class="num">MAE, ₽</th><th class="num">MAPE</th></tr>
-              </thead>
-              <tbody>
-                <% report.buckets.each do |label, bucket| %>
-                  <tr class="<%= comparable.include?(label) ? "is-comparable" : "is-dim" %>">
-                    <td class="muted">за <%= label %></td>
-                    <td class="num"><%= bucket[:samples].zero? ? "—" : bucket[:samples] %></td>
-                    <td class="num"><%= bucket[:samples].zero? ? "—" : rub(bucket[:mae], precision: 2) %></td>
-                    <td class="num"><%= bucket[:samples].zero? ? "—" : "#{rub(bucket[:mape], precision: 2)}%" %></td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
+  <div data-forecasts-target="accuracyBox">
+    <%= render "accuracy_groups", accuracy: accuracy, scoped: true %>
+  </div>
 </section>

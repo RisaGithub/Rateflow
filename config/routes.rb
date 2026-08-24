@@ -3,6 +3,7 @@ Rails.application.routes.draw do
   get "series", to: "series#show"
   get "forecasts", to: "forecasts#show"
   get "forecasts/data", to: "forecasts#data"
+  get "forecasts/accuracy", to: "forecasts#accuracy"
   get "sources", to: "sources#show"
 
   get "cron/refresh", to: "cron#refresh"

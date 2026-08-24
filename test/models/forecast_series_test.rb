@@ -23,6 +23,17 @@ class ForecastSeriesTest < ActiveSupport::TestCase
     assert_equal (newest.captured_at.to_date + 7).iso8601, series[:index].last[:horizon_to]
   end
 
+  test "from keeps only snapshots captured on that date or later, index included" do
+    store_run(Time.utc(2026, 5, 1), 80)
+    inside = store_run(Time.utc(2026, 8, 1), 81)
+
+    series = ForecastSeries.new(currency: "USD", providers: %w[internal], from: Date.new(2026, 7, 1))
+                           .as_json[:series]["internal"]
+
+    assert_equal [ inside.id ], series[:runs].map { |r| r[:id] }
+    assert_equal [ inside.id ], series[:index].map { |r| r[:id] }
+  end
+
   test "latest_only keeps one run per provider and drops the index" do
     store_run(Time.utc(2026, 8, 1), 80)
     newest = store_run(Time.utc(2026, 8, 10), 81)

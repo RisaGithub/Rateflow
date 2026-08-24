@@ -52,6 +52,25 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     assert_nil response.parsed_body.dig("series", "apecon", "index")
   end
 
+  test "from param keeps only snapshots captured on that date or later" do
+    store("apecon", "USD", Time.utc(2026, 5, 1), "78")
+    store("apecon", "USD", Time.utc(2026, 8, 22), "81")
+
+    get forecasts_data_path(currency: "USD", from: "2026-07-01")
+
+    runs = response.parsed_body.dig("series", "apecon", "runs")
+    assert_equal 1, runs.size
+    assert_equal 1, response.parsed_body.dig("series", "apecon", "index").size
+  end
+
+  test "GET /forecasts/accuracy returns the groups for the requested period" do
+    get forecasts_accuracy_path(from: "2026-07-01")
+
+    assert_response :success
+    assert_select "[data-forecasts-target=accuracyGroup]", count: Rate::CURRENCIES.size
+    assert_select "section", count: 0 # groups only, no page shell
+  end
+
   test "run param returns one exact snapshot" do
     run = store("apecon", "USD", Time.utc(2026, 8, 20), "80")
     store("apecon", "USD", Time.utc(2026, 8, 22), "81")
