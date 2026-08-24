@@ -16,7 +16,7 @@ class ForecastSeriesTest < ActiveSupport::TestCase
 
     series = ForecastSeries.new(currency: "USD", providers: %w[internal]).as_json[:series]["internal"]
 
-    assert_operator series[:runs].size, :<=, ForecastSeries::MAX_RUNS
+    assert_equal ForecastSeries::MAX_RUNS, series[:runs].size
     assert_equal newest.id, series[:runs].last[:id]
     assert_equal total, series[:index].size
     assert_equal newest.id, series[:index].last[:id]

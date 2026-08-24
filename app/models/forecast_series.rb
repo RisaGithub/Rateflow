@@ -61,12 +61,11 @@ class ForecastSeries
     end
   end
 
-  # Keep every Nth run counting back from the end so the newest snapshot
-  # always survives — same scheme as RateSeries#thin.
+  # Evenly sampled MAX_RUNS snapshots; the first and the newest always survive.
   def thin(runs)
     return runs if runs.size <= MAX_RUNS
 
-    step = (runs.size.to_f / MAX_RUNS).ceil
-    runs.reverse.each_slice(step).map(&:first).reverse
+    last = runs.size - 1
+    (0...MAX_RUNS).map { |i| runs[(i * last.to_f / (MAX_RUNS - 1)).round] }.uniq
   end
 end

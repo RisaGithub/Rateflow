@@ -18,13 +18,13 @@ const isoDaysAgo = (days) => {
 }
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 const alphaHex = (a) => Math.round(a * 255).toString(16).padStart(2, "0")
-// Keep every Nth item counting back from the end so the newest always survives.
-const thinFromEnd = (items, max) => {
+// Evenly sampled max items; the first and the newest always survive.
+const thinEven = (items, max) => {
   if (items.length <= max) return items
-  const step = Math.ceil(items.length / max)
-  const kept = []
-  for (let i = items.length - 1; i >= 0; i -= step) kept.push(items[i])
-  return kept.reverse()
+  const last = items.length - 1
+  const picked = new Set()
+  for (let i = 0; i < max; i++) picked.add(Math.round(i * last / (max - 1)))
+  return [...picked].sort((a, b) => a - b).map((i) => items[i])
 }
 
 // The Прогнозы page: one currency + source choice drives every block.
@@ -345,7 +345,7 @@ export default class extends Controller {
   renderFan() {
     if (typeof Chart === "undefined") return
 
-    const fans = this.sources().map((p) => ({ provider: p, all: this.runs(p), shown: thinFromEnd(this.runs(p), FAN_MAX) }))
+    const fans = this.sources().map((p) => ({ provider: p, all: this.runs(p), shown: thinEven(this.runs(p), FAN_MAX) }))
     const labels = [...new Set([
       ...this.facts.map(([d]) => d),
       ...fans.flatMap((f) => f.shown.flatMap((r) => r.points.map(([d]) => d)))
