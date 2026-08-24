@@ -23,7 +23,7 @@
         <%= render "segment", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
         <%= render "segment", key: "period", label: "Период",
                    options: [[7, "7 дн"], [30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>
-        <div class="control" data-dashboard-target="range" hidden>
+        <div class="control range" data-dashboard-target="range" hidden>
           <label class="control__label" for="range-from">С</label>
           <input id="range-from" type="date" class="input input--date" data-dashboard-target="fromDate" data-action="change->dashboard#setRange">
           <label class="control__label" for="range-to">по</label>
@@ -31,10 +31,11 @@
         </div>
         <div class="control">
           <span class="control__label">Источники</span>
-          <div class="checks" role="group" aria-label="Источники">
+          <div class="chips" role="group" aria-label="Источники">
             <% Rate::PROVIDERS.each do |p| %>
-              <label class="check">
+              <label class="chip chip--<%= p %>">
                 <input type="checkbox" value="<%= p %>" checked data-dashboard-target="sourceBox" data-action="dashboard#toggleSource">
+                <span class="chip__dot" aria-hidden="true"></span>
                 <span><%= provider_name(p) %></span>
               </label>
             <% end %>

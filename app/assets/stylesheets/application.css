@@ -245,21 +245,38 @@ svg.icon { flex: none; }
 .control[hidden] { display: none; }
 .control__label { color: var(--text-3); font-size: 12px; }
 
-.checks { display: flex; gap: 10px; flex-wrap: wrap; }
-.check {
+/* Source toggles: pill chips, dot colored to match the provider's chart line. */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-2);
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-3);
   font-family: var(--font-mono);
   font-size: 12px;
   cursor: pointer;
+  user-select: none;
   white-space: nowrap;
+  transition: border-color 120ms, color 120ms, background 120ms;
 }
-.check input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); cursor: pointer; }
-.check:hover { color: var(--text); }
+.chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.chip__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); opacity: 0.35; transition: opacity 120ms, background 120ms; }
+.chip:hover { border-color: var(--line-strong); color: var(--text-2); }
+.chip:has(input:checked) { border-color: var(--line-strong); background: var(--hover); color: var(--text); }
+.chip:has(input:focus-visible) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.chip--cbr:has(input:checked) .chip__dot { background: var(--accent); opacity: 1; }
+.chip--erapi:has(input:checked) .chip__dot { background: var(--text-3); opacity: 1; }
+.chip--currencyapi:has(input:checked) .chip__dot { background: var(--text-2); opacity: 1; }
 
-.input--date { width: auto; height: 30px; padding: 0 8px; font-size: 12px; }
+/* Custom date range: one compact non-wrapping group. */
+.range { flex-wrap: nowrap; }
+.input.input--date { width: 148px; height: 30px; padding: 0 8px; font-size: 12px; flex: none; }
 
 /* ---------- Chart ---------- */
 

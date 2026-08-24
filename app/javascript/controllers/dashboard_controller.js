@@ -292,9 +292,11 @@ export default class extends Controller {
       })
     }
 
-    // Multi-year ranges label ticks with the year alone; "dd.mm" is useless there.
+    // Tick format follows the range: days for short spans, month.year for a few
+    // years, the year alone for decades — otherwise labels repeat or lose meaning.
     const yearSpan = labels.length ? Number(labels.at(-1).slice(0, 4)) - Number(labels[0].slice(0, 4)) : 0
-    const tickLabel = (iso) => (yearSpan >= 2 ? iso.slice(0, 4) : dateShort(iso))
+    const tickLabel = (iso) =>
+      yearSpan >= 10 ? iso.slice(0, 4) : yearSpan >= 2 ? iso.slice(5, 7) + "." + iso.slice(0, 4) : dateShort(iso)
 
     const data = { labels, datasets }
     const options = {
