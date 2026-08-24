@@ -51,9 +51,9 @@ A forecast is a **snapshot in time**: the same month may be predicted differentl
 - **АПЭКОН** — monthly forecast parsed from the site, with a min–max corridor.
 - **internal** — our rolling mean (window 7, horizon 7 days), computed server-side (`app/services/internal_forecast.rb`) and re-snapshotted on every data update.
 
-The chart draws either or both as dashed lines over the facts (АПЭКОН gets a shaded corridor). A slider + play button under the chart replays all stored versions of the selected source (~600 ms per version, hidden when there is only one snapshot, auto-play disabled under `prefers-reduced-motion`). Data comes from `GET /forecasts?currency=USD` (optionally `&provider=apecon`), cached for 10 minutes like `/series`.
+Everything forecast-related lives on the `/forecasts` page (the dashboard keeps only a compact teaser card with each source's nearest prediction). One currency + source switch drives four views over the same snapshots: forecast-over-fact chart (dashed lines, АПЭКОН with a shaded corridor, a slider + play button replaying versions at ~600 ms, auto-play disabled under `prefers-reduced-motion`), a fan of all versions at once (newer = brighter), a revision chart for one chosen horizon date (with the CBR fact line once the date has passed), and the accuracy block. Data comes from `GET /forecasts/data?currency=USD` (optionally `&provider=apecon`, `&latest=1` for the teaser, `&run=id` for one exact snapshot), cached for 10 minutes like `/series`; the runs carrying points are thinned to ≤100 per provider (newest always kept), while the metadata index behind the snapshot table stays complete.
 
-**Accuracy**: every matured forecast point (horizon date passed, CBR fact exists, and the prediction was made *before* the date) is scored. The dashboard shows per provider: comparisons count, MAE in ₽, MAPE in %, bucketed by lead time (≤7 / 8–30 / 30+ days). No invented numbers — until forecasts mature, the block says so.
+**Accuracy**: every matured forecast point (horizon date passed, CBR fact exists, and the prediction was made *before* the date) is scored per provider and currency — comparisons count, MAE in ₽, MAPE in %, bucketed by lead time (≤7 / 8–30 / 30+ days). Deliberately no headline totals: the providers forecast different horizons, so only buckets where both have matured points are marked comparable; the rest are dimmed. No invented numbers — until forecasts mature, the block says so.
 
 ## Refreshing data
 
@@ -88,11 +88,12 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 ### Serving the chart
 
-The page embeds only the initial series; every switch fetches `GET /series?currency=USD&providers=cbr,erapi&from=…&to=…`. Responses are cached for 10 minutes (keyed by the query plus the table's max `updated_at`) and downsampled server-side to ~400 points, so the all-time chart stays fast on tens of thousands of rows. `/forecasts` follows the same caching rules.
+The page embeds only the initial series; every switch fetches `GET /series?currency=USD&providers=cbr,erapi&from=…&to=…`. Responses are cached for 10 minutes (keyed by the query plus the table's max `updated_at`) and downsampled server-side to ~400 points, so the all-time chart stays fast on tens of thousands of rows. `/forecasts/data` follows the same caching rules.
 
 ## Pages
 
-- `/` — currency cards (each labeled with its source and date), chart with currency / period / multi-source / forecast-source switches, forecast version playback, a divergence readout for the latest date the sources share, the internal trend panel, forecast accuracy block, converter, history table with a source column and filter.
+- `/` — currency cards (each labeled with its source and date), chart with currency / period / multi-source switches, a divergence readout for the latest date the sources share, a forecast teaser card linking to `/forecasts`, converter, history table with a source column and filter.
+- `/forecasts` — the four forecast views described above plus a paginated table of every stored snapshot (a row click puts that version on the main chart).
 - `/sources` — provider health (last status, success share of the last 20 attempts, mean response time) plus data coverage per provider, and a paginated fetch log with provider/status filters.
 - `/admin` — see above.
 
