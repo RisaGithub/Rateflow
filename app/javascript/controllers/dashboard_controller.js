@@ -2,7 +2,6 @@ import { Controller } from "@hotwired/stimulus"
 
 const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН", internal: "Rateflow" }
 const RATE_PROVIDERS = ["cbr", "erapi", "currencyapi", "apecon"]
-const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Прогноз Rateflow" }
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const fmtPct = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
@@ -19,15 +18,14 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 // Only the initial payload is embedded in the page; every switch fetches
 // the needed series from GET /series.
 export default class extends Controller {
-  static targets = ["card", "seg", "canvas", "legend", "status", "diverge", "tbody", "trend",
-                    "range", "fromDate", "toDate", "sourceBox", "forecastMeta",
-                    "playback", "playBtn", "playSlider", "playLabel"]
+  static targets = ["card", "seg", "canvas", "legend", "status", "diverge", "tbody", "forecast",
+                    "range", "fromDate", "toDate", "sourceBox"]
   static values = { initial: Object }
 
   connect() {
     this.state = {
       currency: "USD", period: 30, from: null, to: null,
-      sources: [...RATE_PROVIDERS], tableSource: "all", rows: 10, forecast: "both"
+      sources: [...RATE_PROVIDERS], tableSource: "all", rows: 10
     }
     this.payload = this.initialValue
     this.forecastPayload = null
@@ -39,7 +37,6 @@ export default class extends Controller {
 
   disconnect() {
     window.removeEventListener("theme:change", this.onTheme)
-    this.stopPlay()
     this.abortController?.abort()
     this.forecastAbort?.abort()
     this.chart?.destroy()
@@ -58,10 +55,6 @@ export default class extends Controller {
     const num = Number(value)
     this.state[key] = Number.isNaN(num) ? value : num
 
-    if (key === "forecast") {
-      this.resetPlayback()
-      return this.render()
-    }
     if (key === "rows" || key === "tableSource") return this.render()
     if (key === "period") {
       this.rangeTarget.hidden = this.state.period !== "custom"
@@ -130,108 +123,31 @@ export default class extends Controller {
     return { from: isoDaysAgo(this.state.period) }
   }
 
-  // Forecast snapshots come from GET /forecasts/data: every stored version for
-  // the current currency, both providers at once. Computation happens server-side;
-  // the browser only picks a snapshot and draws it.
+  // The forecast teaser needs one snapshot per source, nothing more —
+  // GET /forecasts/data?latest=1 returns exactly that. The full history
+  // lives on the /forecasts page.
   async loadForecasts() {
     this.forecastAbort?.abort()
     this.forecastAbort = new AbortController()
     try {
-      const response = await fetch(`/forecasts/data?currency=${this.state.currency}`, {
+      const response = await fetch(`/forecasts/data?currency=${this.state.currency}&latest=1`, {
         signal: this.forecastAbort.signal,
         headers: { Accept: "application/json" }
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       this.forecastPayload = await response.json()
-      this.resetPlayback()
-      this.render()
+      this.renderForecastCard()
     } catch (error) {
       if (error.name !== "AbortError") this.forecastPayload = null
     }
   }
 
-  runs(provider) {
-    return this.forecastPayload?.series?.[provider]?.runs || []
-  }
-
-  // The snapshot currently on the chart — the latest one until playback says otherwise.
-  activeRun(provider) {
-    const runs = this.runs(provider)
-    if (!runs.length) return null
-    if (provider === this.playbackProvider() && this.runIndex != null) return runs[Math.min(this.runIndex, runs.length - 1)]
-    return runs.at(-1)
-  }
-
-  // ----- playback of forecast versions -----
-
-  // The slider walks the snapshots of one provider; in "both" mode АПЭКОН is
-  // the one being scrubbed, the internal line stays at its latest version.
-  playbackProvider() {
-    return this.state.forecast === "internal" ? "internal" : "apecon"
-  }
-
-  resetPlayback() {
-    this.stopPlay()
-    this.runIndex = null
-  }
-
-  scrub(event) {
-    this.stopPlay()
-    this.runIndex = Number(event.target.value)
-    this.render()
-  }
-
-  togglePlay() {
-    this.playTimer ? this.stopPlay() : this.startPlay()
-    this.renderPlayback()
-  }
-
-  // Steps through versions in a loop, ~600 ms per snapshot.
-  startPlay() {
-    const total = this.runs(this.playbackProvider()).length
-    if (total < 2 || this.reducedMotion()) return
-    this.playTimer = setInterval(() => {
-      const runs = this.runs(this.playbackProvider())
-      this.runIndex = ((this.runIndex ?? runs.length - 1) + 1) % runs.length
-      this.render()
-    }, 600)
-  }
-
-  stopPlay() {
-    if (this.playTimer) clearInterval(this.playTimer)
-    this.playTimer = null
+  latestRun(provider) {
+    return this.forecastPayload?.series?.[provider]?.runs?.at(-1) || null
   }
 
   reducedMotion() {
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  }
-
-  renderPlayback() {
-    const runs = this.runs(this.playbackProvider())
-    this.playbackTarget.hidden = runs.length < 2
-    if (runs.length < 2) {
-      this.stopPlay()
-      return
-    }
-    const index = this.runIndex != null ? Math.min(this.runIndex, runs.length - 1) : runs.length - 1
-    this.playSliderTarget.max = runs.length - 1
-    this.playSliderTarget.value = index
-    this.playLabelTarget.textContent =
-      `${dateRu(runs[index].captured_at.slice(0, 10))} · версия ${index + 1} из ${runs.length}`
-    this.playBtnTarget.hidden = this.reducedMotion()
-    this.playBtnTarget.textContent = this.playTimer ? "⏸" : "▶"
-    this.playBtnTarget.setAttribute("aria-label", this.playTimer ? "Пауза" : "Проиграть историю прогноза")
-  }
-
-  forecastProviders() {
-    return this.state.forecast === "both" ? ["apecon", "internal"] : [this.state.forecast]
-  }
-
-  // Latest actual [date, value] by provider priority — the anchor point that
-  // joins the dashed forecast line to the solid history line.
-  lastActual() {
-    const provider = RATE_PROVIDERS.find((p) => this.points(p).length)
-    return provider ? this.points(provider).at(-1) : null
   }
 
   // ----- render -----
@@ -241,13 +157,11 @@ export default class extends Controller {
     this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
     this.sourceBoxTargets.forEach((b) => (b.checked = this.state.sources.includes(b.value)))
     this.renderChart()
-    this.renderPlayback()
     this.renderLegend()
-    this.renderForecastMeta()
     this.renderDiverge()
     this.renderStatus()
     this.renderTable()
-    this.renderTrend()
+    this.renderForecastCard()
   }
 
   // Spread between sources on the most recent date at least two of them share.
@@ -277,63 +191,50 @@ export default class extends Controller {
       `<span class="dot">${detail}</span>`
   }
 
-  // The trend panel shows the latest server-computed internal snapshot; the
-  // browser no longer runs the model itself.
-  renderTrend() {
-    const run = this.runs("internal").at(-1)
-    const anchor = this.lastActual()
-    if (!run || !run.points.length || !anchor) {
-      this.trendTarget.innerHTML = `<p class="panel__note">Недостаточно данных для прогноза Rateflow.</p>`
+  // Compact teaser instead of the old forecast lines: what each source
+  // predicts for the nearest date both cover; when the horizons don't
+  // overlap, each source shows its own nearest point. Details on /forecasts.
+  renderForecastCard() {
+    // The teaser only trusts a payload for the currency on screen.
+    if (this.forecastPayload?.currency !== this.state.currency) {
+      this.forecastTarget.innerHTML = `<p class="panel__note">Загрузка прогноза…</p>`
       return
     }
-    const [endDate, end] = [run.points.at(-1)[0], run.points.at(-1)[1]]
-    const delta = end - anchor[1]
-    const cls = delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat"
-    const sign = delta > 0 ? "+" : delta < 0 ? "−" : ""
-    this.trendTarget.innerHTML = `
-      <div class="panel__row">
-        <div>
-          <div class="panel__label">Ожидаемый курс на ${dateRu(endDate)}</div>
-          <div class="panel__big">${fmtRub.format(end)} ₽</div>
-        </div>
-        <div>
-          <div class="panel__label">К последнему значению</div>
-          <div class="panel__value ${cls}">${sign}${fmtRub.format(Math.abs(delta))} ₽ · ${sign}${fmtPct.format(Math.abs(delta / anchor[1] * 100))}%</div>
-        </div>
-      </div>
-      <p class="panel__note">
-        <b>Метод:</b> скользящее среднее (окно 7), считается на сервере при каждом обновлении данных; снимок от ${dateRu(run.captured_at.slice(0, 10))}, ${run.points.length} точек (пунктир на графике).<br>
-        <b>Точность:</b> сбывшиеся снимки сравниваются с фактом ЦБ РФ — блок «Точность прогнозов» ниже.<br>
-        Это статистическая экстраполяция, а не инвестиционная рекомендация.
-      </p>`
-  }
+    const today = new Date().toISOString().slice(0, 10)
+    const future = (provider) => (this.latestRun(provider)?.points || []).filter(([d]) => d > today)
+    const outlook = { apecon: future("apecon"), internal: future("internal") }
+    const more = `<p class="panel__note"><a class="more-link" href="/forecasts">Подробнее о прогнозах →</a></p>`
 
-  // Chart caption: which snapshots are on screen right now.
-  renderForecastMeta() {
-    const parts = this.forecastProviders().flatMap((provider) => {
-      const run = this.activeRun(provider)
-      if (!run) return []
-      const version = this.runs(provider).indexOf(run) + 1
-      return [`${FORECAST_NAMES[provider]}: снимок от ${dateRu(run.captured_at.slice(0, 10))} (${version} из ${this.runs(provider).length}) · ${run.points.length} тчк · до ${dateRu(run.points.at(-1)[0])}`]
-    })
-    if (!parts.length) {
-      this.forecastMetaTarget.innerHTML = `<span>Прогнозов для ${this.state.currency} пока нет</span>`
+    if (!outlook.apecon.length && !outlook.internal.length) {
+      this.forecastTarget.innerHTML = `<p class="panel__note">Прогнозов для ${this.state.currency} пока нет.</p>${more}`
       return
     }
-    parts.push("не является инвестиционной рекомендацией")
-    this.forecastMetaTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
+
+    const apeconDates = new Set(outlook.apecon.map(([d]) => d))
+    const common = outlook.internal.map(([d]) => d).find((d) => apeconDates.has(d))
+    const head = common
+      ? `<div class="panel__label">На ${dateRu(common)} — ближайшую дату, которую покрывают оба источника</div>`
+      : `<div class="panel__label">Горизонты источников сейчас не пересекаются — у каждого его ближайшая дата</div>`
+
+    const cells = ["apecon", "internal"].flatMap((p) => {
+      if (!outlook[p].length) return []
+      const [date, value] = common ? outlook[p].find(([d]) => d === common) : outlook[p][0]
+      return [`
+        <div>
+          <div class="panel__label">${PROVIDER_NAMES[p]}${common ? "" : ` · ${dateRu(date)}`}</div>
+          <div class="panel__big">${fmtRub.format(value)} ₽</div>
+        </div>`]
+    })
+
+    this.forecastTarget.innerHTML =
+      `${head}<div class="panel__row">${cells.join("")}</div>` +
+      `<p class="panel__note">не является инвестиционной рекомендацией</p>${more}`
   }
 
   renderLegend() {
     const swatch = { cbr: "", erapi: "legend__swatch--alt", currencyapi: "legend__swatch--alt2", apecon: "legend__swatch--apecon" }
-    const items = this.providers().map((p) =>
-      `<span class="legend__item"><span class="legend__swatch ${swatch[p]}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`)
-    this.forecastProviders().forEach((p) => {
-      if (!this.activeRun(p)) return
-      const cls = p === "apecon" ? "legend__swatch--apecon" : ""
-      items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed ${cls}"></span>${FORECAST_NAMES[p]}</span>`)
-    })
-    this.legendTarget.innerHTML = items.join("")
+    this.legendTarget.innerHTML = this.providers().map((p) =>
+      `<span class="legend__item"><span class="legend__swatch ${swatch[p]}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`).join("")
   }
 
   renderTable() {
@@ -371,9 +272,7 @@ export default class extends Controller {
     const line = cssVar("--line")
     const provs = this.providers()
     const series = Object.fromEntries(provs.map((p) => [p, this.points(p)]))
-    const history = [...new Set(provs.flatMap((p) => series[p].map(([d]) => d)))].sort()
-    const lines = this.forecastLines(history)
-    const labels = [...new Set([...history, ...lines.flatMap((l) => l.points.map(([d]) => d))])].sort()
+    const labels = [...new Set(provs.flatMap((p) => series[p].map(([d]) => d)))].sort()
 
     const datasets = provs.map((p) => {
       const byDate = Object.fromEntries(series[p])
@@ -393,47 +292,6 @@ export default class extends Controller {
         pointHoverBorderWidth: 2
       }
     })
-
-    const anchor = this.lastActual()
-    for (const line of lines) {
-      const color = line.provider === "apecon" ? cssVar("--accent-2") : cssVar("--accent")
-      const byDate = Object.fromEntries(line.points.map(([d, v]) => [d, v]))
-      // Dashed continuation joins the actual line when the forecast is purely in the future.
-      if (anchor && line.points[0][0] > anchor[0]) byDate[anchor[0]] = anchor[1]
-      datasets.push({
-        label: FORECAST_NAMES[line.provider],
-        data: labels.map((d) => byDate[d] ?? null),
-        borderColor: color,
-        borderWidth: 2,
-        borderDash: [5, 4],
-        tension: 0.25,
-        spanGaps: true,
-        fill: false,
-        pointRadius: line.provider === "apecon" ? 2.5 : 0,
-        pointBackgroundColor: color,
-        pointBorderColor: color,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: color,
-        pointHoverBorderColor: cssVar("--card"),
-        pointHoverBorderWidth: 2
-      })
-
-      // АПЭКОН publishes a min–max range — drawn as a shaded corridor
-      // between two invisible lines (fill: "+1" spans to the next dataset).
-      const ranged = line.points.filter((p) => p[2] != null && p[3] != null)
-      if (ranged.length > 1) {
-        const corridor = [3, 2].map((i) => {
-          const edge = Object.fromEntries(ranged.map((p) => [p[0], p[i]]))
-          return labels.map((d) => edge[d] ?? null)
-        })
-        datasets.push(
-          { label: "_high", data: corridor[0], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0,
-            tension: 0.25, spanGaps: true, fill: "+1", backgroundColor: color + "24" },
-          { label: "_low", data: corridor[1], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0,
-            tension: 0.25, spanGaps: true, fill: false }
-        )
-      }
-    }
 
     // Tick format follows the range: days for short spans, month.year for a few
     // years, the year alone for decades — otherwise labels repeat or lose meaning.
@@ -456,10 +314,9 @@ export default class extends Controller {
           borderColor: line,
           borderWidth: 1,
           padding: 10,
-          displayColors: provs.length > 1 || lines.length > 0,
+          displayColors: provs.length > 1,
           titleFont: { family: "JetBrains Mono", size: 12 },
           bodyFont: { family: "JetBrains Mono", size: 12 },
-          filter: (item) => !item.dataset.label.startsWith("_"),
           callbacks: {
             title: (items) => dateRu(items[0].label),
             label: (item) => `${item.dataset.label}: ${fmtRub.format(item.parsed.y)} ₽`
@@ -488,22 +345,6 @@ export default class extends Controller {
     } else {
       this.chart = new Chart(this.canvasTarget, { type: "line", data, options })
     }
-  }
-
-  // Forecast points worth drawing: those inside the visible window, extended
-  // forward by at most the width of the shown history — otherwise a five-year
-  // monthly forecast would squash a 30-day chart into a sliver.
-  forecastLines(history) {
-    if (!history.length) return []
-    const first = history[0]
-    const last = history.at(-1)
-    const spanMs = Math.max(new Date(last) - new Date(first), 30 * 86400000)
-    const maxIso = new Date(new Date(last).getTime() + spanMs).toISOString().slice(0, 10)
-    return this.forecastProviders().flatMap((provider) => {
-      const run = this.activeRun(provider)
-      const points = run ? run.points.filter(([d]) => d >= first && d <= maxIso) : []
-      return points.length ? [{ provider, run, points }] : []
-    })
   }
 
   // Vertical fill from ~18% opacity at the top to 0 at the bottom.

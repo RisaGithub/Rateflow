@@ -341,6 +341,9 @@ svg.icon { flex: none; }
 .panel__big { font-family: var(--font-mono); font-size: 26px; font-weight: 500; line-height: 1.1; }
 .panel__note { color: var(--text-3); font-size: 12px; line-height: 1.5; }
 .panel__note b { color: var(--text-2); font-weight: 500; }
+/* «Подробнее» link on the dashboard's forecast teaser card. */
+.more-link { color: var(--accent); font-weight: 500; }
+.more-link:hover { text-decoration: underline; }
 
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { color: var(--text-3); font-size: 12px; }

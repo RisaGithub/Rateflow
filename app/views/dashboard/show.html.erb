@@ -29,8 +29,6 @@
           <label class="control__label" for="range-to">по</label>
           <input id="range-to" type="date" class="input input--date" data-dashboard-target="toDate" data-action="change->dashboard#setRange">
         </div>
-        <%= render "shared/segment", scope: "dashboard", key: "forecast", label: "Прогноз",
-                   options: [["apecon", "АПЭКОН"], ["internal", "Rateflow"], ["both", "Оба"]] %>
         <div class="control">
           <span class="control__label">Источники</span>
           <div class="chips" role="group" aria-label="Источники">
@@ -48,15 +46,7 @@
 
     <div class="card chart-card">
       <div class="chart-wrap"><canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas></div>
-      <div class="playback" data-dashboard-target="playback" hidden>
-        <button type="button" class="playback__btn" data-dashboard-target="playBtn" data-action="dashboard#togglePlay"
-                aria-label="Проиграть историю прогноза">▶</button>
-        <input type="range" class="playback__slider" min="0" max="0" value="0" step="1"
-               data-dashboard-target="playSlider" data-action="input->dashboard#scrub" aria-label="Версия прогноза">
-        <span class="playback__label" data-dashboard-target="playLabel"></span>
-      </div>
       <div class="legend" data-dashboard-target="legend"></div>
-      <div class="status-line" data-dashboard-target="forecastMeta"></div>
       <div class="status-line" data-dashboard-target="diverge"></div>
       <div class="status-line" data-dashboard-target="status"></div>
     </div>
@@ -66,9 +56,13 @@
     <div class="section">
       <div class="section__head">
         <%= render "shared/icon", name: "trend" %>
-        <h2 class="section__title">Тренд</h2>
+        <h2 class="section__title">Прогноз</h2>
       </div>
-      <div class="card panel" data-dashboard-target="trend"></div>
+      <%# Compact teaser: the nearest common forecast date from each source;
+          everything deeper lives on the /forecasts page. %>
+      <div class="card panel" data-dashboard-target="forecast">
+        <p class="panel__note">Загрузка прогноза…</p>
+      </div>
     </div>
 
     <div class="section">
