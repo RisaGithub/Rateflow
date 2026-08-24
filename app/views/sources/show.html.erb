@@ -24,34 +24,32 @@
           <% else %><span class="pill pill--muted">Нет данных</span>
           <% end %>
         </div>
-        <div class="stats">
-          <div>
-            <div class="stat__label">Успешных</div>
+        <div class="provider__body">
+          <div class="donut-stat" title="Доля успешных из последних <%= p.attempts %> попыток">
             <% if p.success_rate %>
-              <div class="stat__donut" title="Доля успешных из последних <%= p.attempts %> попыток"><%= donut(p.success_rate) %></div>
+              <%= donut(p.success_rate, size: 64, stroke: 6) %>
             <% else %>
-              <div class="stat__value">—</div>
+              <div class="donut-stat__empty">—</div>
             <% end %>
+            <div class="stat__label">Успешных</div>
           </div>
-          <div>
-            <div class="stat__label">Среднее время</div>
-            <div class="stat__value"><%= p.avg_duration_ms ? "#{p.avg_duration_ms} мс" : "—" %></div>
-          </div>
-          <div>
-            <div class="stat__label">Последняя попытка</div>
-            <div class="stat__value" style="font-size:13px;margin-top:6px"><%= p.last ? l(p.last.created_at, format: :short_ru) : "—" %></div>
-          </div>
-          <div>
-            <div class="stat__label">Данные с</div>
-            <div class="stat__value stat__value--sm"><%= p.coverage_from ? date_ru(p.coverage_from) : "—" %></div>
-          </div>
-          <div>
-            <div class="stat__label">Данные по</div>
-            <div class="stat__value stat__value--sm"><%= p.coverage_to ? date_ru(p.coverage_to) : "—" %></div>
-          </div>
-          <div>
-            <div class="stat__label">Точек</div>
-            <div class="stat__value stat__value--sm"><%= number_with_delimiter(p.points_count, delimiter: " ") %></div>
+          <div class="stats stats--duo">
+            <div>
+              <div class="stat__label">Среднее время</div>
+              <div class="stat__value"><%= p.avg_duration_ms ? "#{p.avg_duration_ms} мс" : "—" %></div>
+            </div>
+            <div>
+              <div class="stat__label">Последняя попытка</div>
+              <div class="stat__value stat__value--sm"><%= p.last ? l(p.last.created_at, format: :short_ru) : "—" %></div>
+            </div>
+            <div>
+              <div class="stat__label">Период данных</div>
+              <div class="stat__value stat__value--sm"><%= p.coverage_from ? "#{date_ru(p.coverage_from)} — #{date_ru(p.coverage_to)}" : "—" %></div>
+            </div>
+            <div>
+              <div class="stat__label">Точек</div>
+              <div class="stat__value stat__value--sm"><%= number_with_delimiter(p.points_count, delimiter: " ") %></div>
+            </div>
           </div>
         </div>
         <div class="panel__note">Статистика по последним <%= p.attempts %> попыткам</div>

@@ -430,8 +430,22 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 .stat__label { color: var(--text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat__value { font-family: var(--font-mono); font-size: 18px; font-weight: 500; margin-top: 2px; }
 /* Success share as a donut ring: track in the neutral line color, value arc
-   in the "up" green, percentage centered inside. */
-.stat__donut { margin-top: 4px; }
+   in the "up" green, percentage centered inside. Sits to the left of the
+   provider stats as the card's visual anchor. */
+.provider__body { display: flex; align-items: center; gap: 20px; }
+.donut-stat { flex: none; display: grid; justify-items: center; gap: 6px; }
+.donut-stat .donut__num { font-size: 13px; }
+.donut-stat__empty {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--line-strong);
+  border-radius: 50%;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+.stats--duo { flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .donut { display: block; }
 .donut__track { stroke: var(--line-strong); }
 .donut__value { stroke: var(--up); }
