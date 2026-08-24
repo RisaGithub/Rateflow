@@ -458,6 +458,8 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 .provider__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .provider__name { font-size: 15px; }
 .provider__url { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); margin-top: 2px; word-break: break-all; }
+/* Prose caption (the scoring method) — same look as __url, but words wrap whole. */
+.provider__desc { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); margin-top: 2px; max-width: 56ch; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .stat__label { color: var(--text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat__value { font-family: var(--font-mono); font-size: 18px; font-weight: 500; margin-top: 2px; }
@@ -488,6 +490,23 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   font-weight: 500;
+}
+
+/* Accuracy cards: the total-comparisons stat hugs the head's right edge; an
+   empty card stretches its message box to match its neighbour's height. */
+.stat--right { text-align: right; flex: none; align-self: start; }
+.provider--empty { grid-template-rows: auto 1fr; }
+.accuracy-empty {
+  display: grid;
+  place-content: center;
+  padding: 20px;
+  min-height: 140px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 /* Accuracy buckets: only rows where both providers have matured points are
