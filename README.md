@@ -26,8 +26,11 @@ Tests: `bin/rails test` (no network — provider responses are stubbed with save
 
 | Variable | Used by | Behavior when unset |
 |---|---|---|
-| `DATABASE_URL` | production database | — |
-| `SECRET_KEY_BASE` | production | — |
+| `DATABASE_URL` | production database (Supabase **session pooler** string — see Deploy) | app cannot boot |
+| `RAILS_MASTER_KEY` | production: decrypts `config/credentials.yml.enc` (holds `secret_key_base`) | app cannot boot |
+| `RAILS_SERVE_STATIC_FILES` | production: the app itself serves precompiled assets (nothing sits in front of it on Render) | assets 404 |
+| `APP_HOST` | production: extra allowed domain besides `*.onrender.com` | only the Render domain is allowed |
+| `TZ` | keeps the OS clock in Moscow time, matching `config.time_zone` | logs/cron timestamps drift to UTC |
 | `CRON_TOKEN` | `GET /cron/*` endpoints | endpoints answer **503** (never open to everyone) |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `/admin` (HTTP Basic) | page answers **503** with a hint |
 
@@ -99,12 +102,36 @@ The page embeds only the initial series; every switch fetches `GET /series?curre
 
 ## Deploy (Render + Supabase)
 
-1. Create a Postgres database on Supabase and copy its connection URI.
-2. On Render create a **Web Service** from this repo:
-   - Build command: `bin/render-build.sh`
-   - Start command: `bin/rails db:migrate && bin/rails server`
-   - Environment: `DATABASE_URL` = Supabase URI, `RAILS_ENV=production`, `SECRET_KEY_BASE` = output of `bin/rails secret`, `CRON_TOKEN`, `ADMIN_USER`, `ADMIN_PASSWORD`
-3. Point any external scheduler (e.g. cron-job.org) at the two `/cron/*` URLs above — `/cron/refresh` once or twice a day, `/cron/forecasts` about four times a day.
-4. Run `bundle exec rake rates:backfill` once (from the Render shell or locally against the production `DATABASE_URL`) to load the archive.
+The repo ships a Render **Blueprint** (`render.yaml`): one Ruby web service, `bin/render-build.sh` as the build command (gems → assets → `db:migrate`, `errexit` so a broken step fails the deploy and the previous version stays live), Puma as the start command, health check on `/up`. The database lives on Supabase and reaches the app through `DATABASE_URL`.
 
-In production the database is read from `DATABASE_URL`; migrations run on every start.
+### Which Supabase connection string — and why
+
+Supabase offers three connection strings; only one of them is right here:
+
+- **Direct connection** (port 5432) — resolves to IPv6 only unless you pay for a dedicated IPv4 address. Render's runtime has no outbound IPv6, so this string will simply not connect. **Do not use.**
+- **Session pooler** (Supavisor, port 5432) — IPv4-friendly and built for long-lived backends holding persistent connections, which is exactly what Puma is. Behaves like plain Postgres, prepared statements included. **This is the one to copy.**
+- **Transaction pooler** (port 6543) — for serverless functions that connect per request; requires prepared statements to be switched off. Wrong tool for this app.
+
+### Step by step
+
+1. **Supabase**: create a project (Region — pick one close to Render's), wait for it to provision. Press **Connect** at the top of the dashboard, switch to the **Session pooler** tab, copy the URI (`postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres`) and substitute the database password you set at project creation.
+2. **Render**: New → **Blueprint**, connect the `RisaGithub/Rateflow` GitHub repo, branch `main`. Render reads `render.yaml` and asks for the values marked `sync: false`:
+   - `DATABASE_URL` — the session pooler URI from step 1;
+   - `RAILS_MASTER_KEY` — the contents of your local `config/master.key` (one line; it is gitignored, which is why Render must be told it);
+   - `CRON_TOKEN` — any long random string (`openssl rand -hex 24`);
+   - `ADMIN_USER`, `ADMIN_PASSWORD` — credentials for `/admin`.
+   `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
+3. **First data** (the tables are empty): open `https://<app>.onrender.com/admin`, sign in and press, in order, «Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow» — that seeds the site with a live last year of data. The long tasks (full archive and forecast backtest) are too slow for a web request and the free Render tier has no shell, so run them **locally against the production database** — the session pooler string works from a laptop too:
+
+   ```sh
+   DATABASE_URL="postgresql://...pooler.supabase.com:5432/postgres" RAILS_ENV=production \
+     bin/rails "rates:backfill[1999-01-01]"   # ~5 min
+   DATABASE_URL="postgresql://...pooler.supabase.com:5432/postgres" RAILS_ENV=production \
+     bin/rails "forecasts:backtest[180]"      # seconds
+   ```
+4. **Scheduler** (e.g. cron-job.org): two GET jobs with the token from step 2 —
+   - `https://<app>.onrender.com/cron/refresh?token=…` every 6 hours;
+   - `https://<app>.onrender.com/cron/forecasts?token=…` 4 times a day (each call refreshes one АПЭКОН currency, so all four rotate through daily).
+5. **Custom domain later**: add it in Render, then set `APP_HOST` to that domain so Rails' host allowlist accepts it.
+
+**Free-tier sleep**: Render suspends a free service after ~15 minutes of no traffic, and the next request waits several seconds while it wakes. The scheduler calls above double as keep-alive pings — with them the app is asleep at most between cron hits, and the health check `/up` never redirects to HTTPS so wake-ups stay cheap.
