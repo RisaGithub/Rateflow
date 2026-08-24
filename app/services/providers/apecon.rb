@@ -26,6 +26,9 @@ module Providers
     NUMBER_RE = /\A\d+(?:[.,]\d+)?\z/
     PERCENT_RE = /\A[+−-]?\d+(?:[.,]\d+)?\s*%\z/
 
+    # Result of one fetch_forecast call.
+    ForecastResult = Struct.new(:points, :source_url, :http_status, keyword_init: true)
+
     CRAWL_LOCK = Mutex.new
 
     class << self
@@ -56,6 +59,19 @@ module Providers
       raise error if records.empty? && error
 
       Result.new(records: records, http_status: status)
+    end
+
+    # Monthly forecast for one currency: an array of
+    # {horizon_date:, value:, low:, high:} points, horizon_date being the first
+    # day of the forecast month. Fewer than two recognized rows means the
+    # markup changed — that is a provider error, not a partial success.
+    def fetch_forecast(currency)
+      url = PAGES.fetch(currency) { raise Error, "Unknown currency #{currency}" }
+      body, status = get(url)
+      points = parse_forecast(body)
+      raise Error, "Monthly forecast table not recognized" if points.size < 2
+
+      ForecastResult.new(points: points, source_url: url, http_status: status)
     end
 
     private
@@ -92,6 +108,29 @@ module Providers
 
     def parse_html(body)
       Nokogiri::HTML(body.to_s.force_encoding("utf-8"))
+    end
+
+    # The monthly tables interleave two kinds of rows: a single-cell year header
+    # («2026», «2028 продолжение») and data rows «Ммм | мин-макс | курс | %».
+    # The month may also carry its own year («Авг 2026»). Rows are matched by
+    # that shape, so cosmetic markup changes don't break the parser.
+    def parse_forecast(body)
+      points, year = [], nil
+      each_row(parse_html(body)) do |cells|
+        if cells.size == 1 && (y = cells.first[/\A(\d{4})\b/, 1])
+          year = y.to_i
+        elsif (month = cells.first&.match(MONTH_RE)) && (range = cells[1]&.match(RANGE_RE))
+          row_year = month[2]&.to_i || year
+          next unless row_year && cells[2]&.match?(NUMBER_RE)
+
+          low, high = [ decimal(range[1]), decimal(range[2]) ].sort
+          points << { horizon_date: Date.new(row_year, MONTHS.index(month[1].downcase) + 1, 1),
+                      value: decimal(cells[2]), low: low, high: high }
+        end
+      end
+      points.uniq { |p| p[:horizon_date] }
+    rescue Date::Error => e
+      raise Error, "Unexpected apecon page: #{e.message}"
     end
 
     # Yields every table row as an array of stripped cell texts, in document order.
