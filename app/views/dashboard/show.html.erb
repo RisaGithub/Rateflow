@@ -2,7 +2,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js" crossorigin="anonymous"></script>
 <% end %>
 
-<div data-controller="dashboard" data-dashboard-series-value="<%= @dashboard.series.to_json %>" class="page" style="padding:0">
+<div data-controller="dashboard" data-dashboard-initial-value="<%= @dashboard.initial_series.to_json %>" class="page" style="padding:0">
   <div>
     <h1 class="page-title">Курсы валют к рублю</h1>
     <p class="page-sub">USD, EUR, CNY и GBP по данным ЦБ РФ с резервом из ER-API</p>

@@ -1,23 +1,29 @@
 import { Controller } from "@hotwired/stimulus"
 import { forecast, backtest, nextDates, WINDOW, HORIZON } from "forecast"
 
-const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API" }
+const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API" }
 const fmtRub = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 const fmtPct = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
 const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
 const dateShort = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7)
+const isoDaysAgo = (days) => {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
-// Dashboard state lives here: selected currency / period / source.
-// All series for the last 90 days are embedded in the page, so every switch
-// is a pure client-side re-render — no round trips.
+// Dashboard state lives here: selected currency / period / sources.
+// Only the initial payload is embedded in the page; every switch fetches
+// the needed series from GET /series.
 export default class extends Controller {
   static targets = ["card", "seg", "canvas", "legend", "status", "tbody", "trend"]
-  static values = { series: Object }
+  static values = { initial: Object }
 
   connect() {
     this.state = { currency: "USD", days: 30, source: "cbr", rows: 10 }
+    this.payload = this.initialValue
     this.onTheme = () => this.render()
     window.addEventListener("theme:change", this.onTheme)
     this.render()
@@ -25,6 +31,7 @@ export default class extends Controller {
 
   disconnect() {
     window.removeEventListener("theme:change", this.onTheme)
+    this.abortController?.abort()
     this.chart?.destroy()
   }
 
@@ -32,37 +39,61 @@ export default class extends Controller {
 
   selectCurrency(event) {
     this.state.currency = event.currentTarget.dataset.currency
-    this.render()
+    this.load()
   }
 
   setOption(event) {
     const { key, value } = event.currentTarget.dataset
     this.state[key] = key === "days" || key === "rows" ? Number(value) : value
-    this.render()
+    key === "rows" ? this.render() : this.load()
   }
 
   // ----- data -----
 
-  // Points of one provider for the current currency, limited to the selected period.
+  // Fetches the series for the current state and re-renders. A failed fetch
+  // keeps the previous data on screen and reports the problem in the status line.
+  async load() {
+    const params = new URLSearchParams({
+      currency: this.state.currency,
+      providers: this.providers().join(","),
+      from: isoDaysAgo(this.state.days)
+    })
+    this.abortController?.abort()
+    this.abortController = new AbortController()
+    this.render()
+    try {
+      const response = await fetch(`/series?${params}`, {
+        signal: this.abortController.signal,
+        headers: { Accept: "application/json" }
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      this.payload = await response.json()
+      this.render()
+    } catch (error) {
+      if (error.name === "AbortError") return
+      this.statusTarget.innerHTML = `<span>Не удалось загрузить данные — показаны последние загруженные</span>`
+    }
+  }
+
+  // Points of one provider as loaded for the current currency and period.
   points(provider) {
-    const all = this.seriesValue[this.state.currency]?.[provider] || []
-    const from = new Date()
-    from.setDate(from.getDate() - this.state.days)
-    const iso = from.toISOString().slice(0, 10)
-    return all.filter(([d]) => d >= iso)
+    return this.payload?.series?.[provider]?.points || []
+  }
+
+  total(provider) {
+    return this.payload?.series?.[provider]?.total || 0
   }
 
   providers() {
     return this.state.source === "both" ? ["cbr", "erapi"] : [this.state.source]
   }
 
-  // Rolling-mean forecast for the primary visible provider, built on the full
-  // 90-day series (not just the visible window) so the backtest has more samples.
+  // Rolling-mean forecast for the first visible provider that has enough data.
   trend() {
-    const provider = this.providers()[0]
-    const all = this.seriesValue[this.state.currency]?.[provider] || []
-    if (all.length < WINDOW + 1) return null
+    const provider = this.providers().find((p) => this.points(p).length >= WINDOW + 1)
+    if (!provider) return null
 
+    const all = this.points(provider)
     const values = all.map(([, v]) => v)
     const [from, last] = all.at(-1)
     return {
@@ -116,7 +147,7 @@ export default class extends Controller {
 
   renderLegend() {
     const items = this.providers().map((p) =>
-      `<span class="legend__item"><span class="legend__swatch ${p === "erapi" ? "legend__swatch--alt" : ""}"></span>${PROVIDER_NAMES[p]}</span>`)
+      `<span class="legend__item"><span class="legend__swatch ${p === "cbr" ? "" : "legend__swatch--alt"}"></span>${PROVIDER_NAMES[p]} · ${this.total(p)} тчк</span>`)
     if (this.trend()) items.push(`<span class="legend__item"><span class="legend__swatch legend__swatch--dashed"></span>Прогноз</span>`)
     this.legendTarget.innerHTML = items.join("")
   }
@@ -148,7 +179,7 @@ export default class extends Controller {
   }
 
   renderChart() {
-    const colors = { cbr: cssVar("--accent"), erapi: cssVar("--text-3") }
+    const colors = { cbr: cssVar("--accent"), erapi: cssVar("--text-3"), currencyapi: cssVar("--text-2") }
     const text3 = cssVar("--text-3")
     const line = cssVar("--line")
     const provs = this.providers()
@@ -163,7 +194,7 @@ export default class extends Controller {
         label: PROVIDER_NAMES[p],
         data: labels.map((d) => byDate[d] ?? null),
         borderColor: colors[p],
-        borderWidth: 2,
+        borderWidth: p === "cbr" ? 2 : 1.5,
         tension: 0.25,
         spanGaps: true,
         fill: provs.length === 1,
@@ -256,26 +287,16 @@ export default class extends Controller {
   }
 
   renderStatus() {
-    const cur = this.state.currency
-    const all = this.seriesValue[cur] || {}
-    const last = (p) => all[p]?.at(-1)
-    const cbr = last("cbr"), erapi = last("erapi")
-    const primary = this.state.source === "erapi" ? "erapi" : "cbr"
-    const main = last(primary) || last(primary === "cbr" ? "erapi" : "cbr")
-    const parts = []
-
-    if (!main) {
-      this.statusTarget.innerHTML = `<span>Нет данных по ${cur}</span>`
+    const provs = this.providers()
+    const withData = provs.filter((p) => this.points(p).length)
+    if (!withData.length) {
+      this.statusTarget.innerHTML = `<span>Нет данных по ${this.state.currency}</span>`
       return
     }
 
-    parts.push(this.state.source === "both" ? "Источники: ЦБ РФ и ER-API" : `Источник: ${PROVIDER_NAMES[primary]}`)
-    parts.push(`обновлено ${dateRu(main[0])}`)
-    if (cbr && erapi) {
-      const diff = Math.abs(cbr[1] - erapi[1]) / cbr[1] * 100
-      const other = this.state.source === "erapi" ? "ЦБ РФ" : "ER-API"
-      parts.push(`расхождение с ${other} ${fmtPct.format(diff)}%`)
-    }
+    const parts = [`Источники: ${withData.map((p) => PROVIDER_NAMES[p]).join(", ")}`]
+    const lastDate = withData.map((p) => this.points(p).at(-1)[0]).sort().at(-1)
+    parts.push(`обновлено ${dateRu(lastDate)}`)
     this.statusTarget.innerHTML = parts.map((t, i) => `<span class="${i ? "dot" : ""}">${t}</span>`).join("")
   }
 }
