@@ -39,7 +39,7 @@ class InternalForecast
 
   # Same priority as the dashboard cards: the first provider with enough data.
   def source_provider(currency)
-    Rate::PROVIDERS.find { |p| Rate.for(currency, p).count >= WINDOW + 1 }
+    Rate::SOURCE_PRIORITY.find { |p| Rate.for(currency, p).count >= WINDOW + 1 }
   end
 
   # Rolling-mean continuation — the exact logic previously in forecast.js.

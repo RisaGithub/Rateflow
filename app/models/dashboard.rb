@@ -26,10 +26,11 @@ class Dashboard
 
   private
 
-  # Cards follow provider priority: CBR first, the other two step in only
-  # when it has nothing for the currency.
+  # Cards follow Rate::SOURCE_PRIORITY: CBR first, the API mirrors step in
+  # only when it has nothing for the currency, АПЭКОН strictly last. The card
+  # always names the provider and date it shows (see _card.html.erb).
   def card(currency)
-    provider = Rate::PROVIDERS.find { |p| Rate.for(currency, p).exists? }
+    provider = Rate::SOURCE_PRIORITY.find { |p| Rate.for(currency, p).exists? }
     return Card.new(code: currency, name: NAMES[currency]) unless provider
 
     last, prev = Rate.for(currency, provider).order(on_date: :desc).limit(2).to_a

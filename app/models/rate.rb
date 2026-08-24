@@ -1,6 +1,11 @@
 class Rate < ApplicationRecord
   CURRENCIES = %w[USD EUR CNY GBP].freeze
   PROVIDERS = %w[cbr erapi currencyapi apecon].freeze
+  # Which provider's rate to show when several have data: the official CBR
+  # first, then the API mirrors, and the АПЭКОН quote — a number scraped from
+  # someone else's site — strictly last. Deliberately its own constant:
+  # PROVIDERS is an unordered registry, this is a policy.
+  SOURCE_PRIORITY = %w[cbr currencyapi erapi apecon].freeze
 
   validates :currency, inclusion: { in: CURRENCIES }
   validates :provider, inclusion: { in: PROVIDERS }
