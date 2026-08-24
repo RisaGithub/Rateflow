@@ -1,0 +1,29 @@
+# Render Blueprint: one Ruby web service. The database is NOT here — it lives
+# on Supabase; paste its *session pooler* connection string into DATABASE_URL
+# (see README, «Deploy»). Values marked sync: false are asked for once in the
+# Render dashboard and never stored in the repo.
+services:
+  - type: web
+    name: rateflow
+    runtime: ruby
+    plan: free
+    buildCommand: bin/render-build.sh
+    startCommand: bundle exec puma -C config/puma.rb
+    healthCheckPath: /up
+    envVars:
+      - key: RAILS_MASTER_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CRON_TOKEN
+        sync: false
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: RAILS_ENV
+        value: production
+      - key: RAILS_SERVE_STATIC_FILES
+        value: "true"
+      - key: TZ
+        value: Europe/Moscow
