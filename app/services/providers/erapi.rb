@@ -6,14 +6,17 @@ module Providers
 
     def fetch(currencies)
       body, status = get(ENDPOINT)
-      rates = parse(body)
+      json = parse(body)
+      rates = json.fetch("rates") { raise Error, "No rates in response" }
+                  .transform_values { |v| BigDecimal(v.to_s) }
       rub = rates["RUB"] or raise Error, "No RUB in response"
+      on_date = update_date(json)
 
       records = currencies.filter_map do |currency|
         base = rates[currency]
         next if base.nil? || base.zero?
 
-        { currency: currency, on_date: Date.current, value: (rub / base).round(4) }
+        { currency: currency, on_date: on_date, value: (rub / base).round(4) }
       end
 
       Result.new(records: records, http_status: status)
@@ -25,8 +28,16 @@ module Providers
       json = JSON.parse(body)
       raise Error, "API result: #{json['result']} #{json['error-type']}" unless json["result"] == "success"
 
-      json.fetch("rates").transform_values { |v| BigDecimal(v.to_s) }
-    rescue JSON::ParserError, KeyError => e
+      json
+    rescue JSON::ParserError => e
+      raise Error, "Unexpected ER-API payload: #{e.message}"
+    end
+
+    # The snapshot is stamped by the API itself ("Sat, 24 Aug 2026 00:02:31 +0000");
+    # trusting it instead of the local clock keeps the date right across midnight.
+    def update_date(json)
+      Time.rfc2822(json.fetch("time_last_update_utc")).utc.to_date
+    rescue KeyError, ArgumentError => e
       raise Error, "Unexpected ER-API payload: #{e.message}"
     end
   end

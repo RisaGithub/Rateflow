@@ -28,7 +28,9 @@ module Rateflow
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
-    config.time_zone = "Moscow"
+    # CBR rates live in Moscow time; keeping the app clock there means
+    # Date.current matches the date the rates are published under.
+    config.time_zone = "Europe/Moscow"
 
     # Configuration for the application, engines, and railties goes here.
     #
