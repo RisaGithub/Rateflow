@@ -1,36 +1,7 @@
 /* ---------- Palette & themes ---------- */
 
+/* Dark is the default; light is an explicit opt-in via data-theme. */
 :root {
-  --bg: #F1F2F5;
-  --card: #FFFFFF;
-  --text: #0C0E14;
-  --text-2: #4A5162;
-  --text-3: #818899;
-  --accent: #2547D8;
-  --accent-2: #B4540A;
-  --up: #17795E;
-  --down: #B03A48;
-  --shadow: 0 1px 2px rgb(12 14 20 / 0.04), 0 4px 14px rgb(12 14 20 / 0.05);
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #07080C;
-    --card: #0E1017;
-    --text: #EEF0F6;
-    --text-2: #A6ADBF;
-    --text-3: #737B8E;
-    --accent: #7A93FF;
-    --accent-2: #F0A05A;
-    --up: #4FCFA6;
-    --down: #FF8A98;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.35);
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme="dark"] {
   --bg: #07080C;
   --card: #0E1017;
   --text: #EEF0F6;
@@ -42,6 +13,20 @@
   --down: #FF8A98;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.35);
   color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #F1F2F5;
+  --card: #FFFFFF;
+  --text: #0C0E14;
+  --text-2: #4A5162;
+  --text-3: #818899;
+  --accent: #2547D8;
+  --accent-2: #B4540A;
+  --up: #17795E;
+  --down: #B03A48;
+  --shadow: 0 1px 2px rgb(12 14 20 / 0.04), 0 4px 14px rgb(12 14 20 / 0.05);
+  color-scheme: light;
 }
 
 /* Derived tokens: borders/lines mixed from the text color so they survive theme switches. */
@@ -59,6 +44,26 @@
 
   --radius: 4px;
   --gap: 16px;
+}
+
+/* ---------- Motion: theme switch ---------- */
+
+/* Crossfade for the View Transitions API path (see theme_controller). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: ease;
+}
+
+/* Fallback: the controller briefly adds .theme-anim to <html> while toggling. */
+.theme-anim, .theme-anim *, .theme-anim *::before, .theme-anim *::after {
+  transition:
+    background-color 280ms ease,
+    color 280ms ease,
+    border-color 280ms ease,
+    fill 280ms ease,
+    stroke 280ms ease,
+    box-shadow 280ms ease !important;
 }
 
 /* ---------- Base ---------- */
@@ -152,13 +157,9 @@ svg.icon { flex: none; }
 
 /* The sun and the moon share one cell; only one of them is ever shown. */
 .theme-toggle .icon { grid-area: 1 / 1; }
-.theme-toggle__moon { display: none; }
-:root[data-theme="dark"] .theme-toggle__moon { display: block; }
-:root[data-theme="dark"] .theme-toggle__sun { display: none; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .theme-toggle__moon { display: block; }
-  :root:not([data-theme="light"]) .theme-toggle__sun { display: none; }
-}
+.theme-toggle__sun { display: none; }
+:root[data-theme="light"] .theme-toggle__sun { display: block; }
+:root[data-theme="light"] .theme-toggle__moon { display: none; }
 
 /* ---------- Cards & sections ---------- */
 
