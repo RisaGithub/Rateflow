@@ -86,7 +86,7 @@ A forecast is a **snapshot in time**: the same month may be predicted differentl
 
 Everything forecast-related lives on the `/forecasts` page (the dashboard keeps only a compact teaser card with each source's nearest prediction). One currency + period + source switch drives four views over the same snapshots: forecast-over-fact chart (dashed lines, АПЭКОН with a shaded corridor, a slider + play button replaying versions at ~600 ms, auto-play disabled under `prefers-reduced-motion`), a fan of all versions at once (newer = brighter), a revision chart for one chosen horizon date (with the CBR fact line once the date has passed), and the accuracy block. The period switch (default 90 days, plus a «Свой» custom from–to range in a small popover — same as on the dashboard) bounds the fact line and the snapshot capture dates — the forecast part of the main chart always shows in full. Data comes from `GET /forecasts/data?currency=USD` (optionally `&provider=apecon`, `&from=date&to=date` for the period, `&latest=1` for the teaser, `&run=id` for one exact snapshot), cached for 10 minutes like `/series`; the runs carrying points are thinned to ≤100 per provider (newest always kept), while the metadata index behind the snapshot table stays complete. The accuracy section body is served by `GET /forecasts/accuracy?from=date&to=date` so the period switch can rescore it without a reload.
 
-**Accuracy**: every matured forecast point (horizon date passed, CBR fact exists, and the prediction was made *before* the date) is scored per provider and currency — comparisons count, MAE in ₽, MAPE in %, bucketed by lead time (≤7 / 8–30 / 30+ days). Deliberately no headline totals: the providers forecast different horizons, so only buckets where both have matured points are marked comparable; the rest are dimmed. No invented numbers — until forecasts mature, the block says so.
+**Accuracy**: every matured forecast point (horizon date passed, CBR fact exists, and the prediction was made *before* the date) is scored per provider and currency — comparisons count, MAE in ₽, MAPE in %, bucketed by lead time (≤7 / 8–30 / 30+ days). Deliberately no headline totals: the providers forecast different horizons, so only buckets where both have matured points are marked comparable; the rest are dimmed. No invented numbers — until forecasts mature, the block says so. The internal model's figures come from a backtest — the same model replayed over past data with no peeking ahead — while АПЭКОН's come from predictions it actually published; the UI labels which is which.
 
 ## Refreshing data
 
@@ -183,16 +183,18 @@ bin/prod rake forecasts:fetch                # АПЭКОН, all four currencies
 
 Every task is idempotent (rows are upserted, snapshots dedup) — if a step dies half-way, just rerun that step. If the connection refuses: make sure the string is from the **Session pooler** tab, try appending `?sslmode=require`, and URL-encode any special characters in the password. `bin/prod rails server` also works for a final look at the real data before sharing the link — remember that you are then writing to the production database.
 
-## Limitations
+## Roadmap
 
-Honest list of what this project does **not** do:
+The data model and the scoring harness were built to be extended — these are the next things they make possible:
 
-- **Four currencies only** (USD, EUR, CNY, GBP) against the ruble — adding one means touching `Rate::CURRENCIES` and the АПЭКОН page list, not a config file.
-- **The internal forecast is deliberately simple** — a rolling mean with a widening corridor, there to demonstrate versioning and honest accuracy scoring, not to beat anyone. The accuracy block exists precisely so you can see how simple it is.
-- **Data can lag.** Everything updates on an external scheduler's cadence (hours, not seconds); АПЭКОН is refreshed one currency per call to respect its 10-second crawl delay. This is a daily-rates site, not a live ticker.
-- **Free hosting sleeps.** On Render's free tier the first request after a quiet stretch takes a few seconds while the service wakes; the cron pings keep this rare.
-- **Backtested internal accuracy is a replay**, not archived live predictions — the model re-run over past facts with no peeking. The UI and the accuracy block say so where it matters.
-- **No accounts, no API guarantees, no investment advice.**
+- **More currencies, driven by configuration.** Adding a pair today means touching `Rate::CURRENCIES` and the АПЭКОН page map; moving that into a registry opens the door to JPY, TRY, KZT and the rest without code changes.
+- **Stronger forecasting models.** The rolling mean is a deliberate baseline — something honest to measure against. Exponential smoothing, ARIMA and a seasonal model can drop straight into `InternalForecast` and be scored side by side in the accuracy block that already exists.
+- **More forecast providers.** `forecast_runs` / `forecast_points` are provider-agnostic by design, so a new source of predictions is a parser and a key, not a migration.
+- **Intraday rates.** Official daily fixings are the backbone; adding an exchange feed alongside them would turn the dashboard into something you can watch during the day, not just read in the morning.
+- **A public JSON API.** `/series` and `/forecasts/data` already speak JSON — documenting them, versioning them and adding CORS makes the whole archive reusable by other projects.
+- **Data export.** One-click CSV or JSON for any series and period, straight from the chart.
+- **Alerts.** Notify when a rate crosses a threshold, or when a forecast for a date gets revised sharply — the revision history needed for that is already stored.
+- **Always-on hosting.** Moving off the free tier removes the cold start after quiet stretches and lets the cache and rate limiter live in Redis instead of process memory.
 
 ## License
 
