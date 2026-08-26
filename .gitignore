@@ -12,4 +12,5 @@
 /config/master.key
 /config/credentials/*.key
 .env*
+!.env.example
 .DS_Store

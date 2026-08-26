@@ -6,7 +6,30 @@ Public dashboard of USD, EUR, CNY and GBP exchange rates against the Russian rub
 
 ## Stack
 
-Ruby 3.4 · Rails 8.1 · PostgreSQL · Hotwire (Turbo + Stimulus) via importmap · Chart.js (vendored, so the chart works offline) · plain CSS with light/dark themes. No user accounts, no background workers, no extra gems.
+Ruby 3.4 · Rails 8.1 · PostgreSQL · Hotwire (Turbo + Stimulus) via importmap · Chart.js (vendored, so the chart works offline) · plain CSS, dark theme by default with a light toggle. No user accounts, no background workers, no extra gems.
+
+## Architecture
+
+```
+external sources                 services                       storage → pages
+────────────────                 ────────                       ───────────────
+CBR / ER-API / Currency API ──▶  RatesFetcher ────────────────▶ rates ──────────▶ / (dashboard), /series
+apecon.ru (HTML) ─────────────▶  ForecastsFetcher ─┐
+                                 InternalForecast ─┴──────────▶ forecast_runs ──▶ /forecasts, /forecasts/data
+                                                                + forecast_points
+every fetch attempt ──────────▶  (logged inline) ─────────────▶ fetch_logs ─────▶ /sources, /admin
+```
+
+An external scheduler GETs `/cron/refresh` and `/cron/forecasts`; the controllers call the same service objects the admin buttons and rake tasks use, everything runs inside the request (no queues), results are upserted, and every attempt lands in `fetch_logs`. Pages read through thin read models (`Dashboard`, `RateSeries`, `ForecastSeries`, `ForecastAccuracy`) that keep the heavy lifting in SQL; charts fetch JSON (`/series`, `/forecasts/data`) that is cached for 10 minutes and invalidated by the tables' `max(updated_at)`.
+
+## Data schema
+
+Four tables, no users, no queues:
+
+- **rates** — one row per (currency, provider, date): the fact. Unique index on the triple; upserts keep re-fetches idempotent.
+- **forecast_runs** — one stored forecast snapshot: provider (`apecon` / `internal`), currency, `captured_at`. A snapshot identical to the previous one only bumps `captured_at`.
+- **forecast_points** — the payload of a run: horizon date, predicted value, optional min–max corridor. `belongs_to :forecast_run`, unique per (run, horizon date).
+- **fetch_logs** — journal of every call to every source: provider, kind (`rates` / `forecast`), ok flag, HTTP status, duration, error, rows written. Feeds `/sources`, `/admin` and the cron throttle; pruned after 90 days.
 
 ## Run locally
 
@@ -31,8 +54,11 @@ Tests: `bin/rails test` (no network — provider responses are stubbed with save
 | `RAILS_SERVE_STATIC_FILES` | production: the app itself serves precompiled assets (nothing sits in front of it on Render) | assets 404 |
 | `APP_HOST` | production: extra allowed domain besides `*.onrender.com` | only the Render domain is allowed |
 | `TZ` | keeps the OS clock in Moscow time, matching `config.time_zone` | logs/cron timestamps drift to UTC |
+| `RAILS_MAX_THREADS` | Puma thread count **and** the Active Record pool size (kept equal so the app never wants more DB connections than Supabase's free tier gives) | both default to 3 (5 for the pool outside Puma) |
 | `CRON_TOKEN` | `GET /cron/*` endpoints | endpoints answer **503** (never open to everyone) |
 | `ADMIN_USER`, `ADMIN_PASSWORD` | `/admin` (HTTP Basic) | page answers **503** with a hint |
+
+`.env.example` lists every variable with a comment; copy it to `.env` for development — the file is gitignored and loaded automatically in development and test.
 
 ## Data sources
 
@@ -47,6 +73,8 @@ The three API providers are polled together on every rates run; АПЭКОН's q
 
 All keyless. Every request has a 10-second timeout; network errors are caught, logged to FetchLog, and never raised to the page.
 
+![Sources page](docs/sources.jpg)
+
 ## Forecasts
 
 A forecast is a **snapshot in time**: the same month may be predicted differently tomorrow, and that evolution is the point. Snapshots are stored in `forecast_runs` (provider, currency, captured_at) with points in `forecast_points` (horizon date, value, optional min–max range). A snapshot identical to the previous one only refreshes its `captured_at` — no duplicate versions pile up.
@@ -54,7 +82,9 @@ A forecast is a **snapshot in time**: the same month may be predicted differentl
 - **АПЭКОН** — monthly forecast parsed from the site, with a min–max corridor.
 - **internal** — our rolling mean (window 7, horizon 7 days), computed server-side (`app/services/internal_forecast.rb`) and re-snapshotted on every data update.
 
-Everything forecast-related lives on the `/forecasts` page (the dashboard keeps only a compact teaser card with each source's nearest prediction). One currency + period + source switch drives four views over the same snapshots: forecast-over-fact chart (dashed lines, АПЭКОН with a shaded corridor, a slider + play button replaying versions at ~600 ms, auto-play disabled under `prefers-reduced-motion`), a fan of all versions at once (newer = brighter), a revision chart for one chosen horizon date (with the CBR fact line once the date has passed), and the accuracy block. The period (default 90 days) bounds the fact line and the snapshot capture dates — the forecast part of the main chart always shows in full. Data comes from `GET /forecasts/data?currency=USD` (optionally `&provider=apecon`, `&from=date` for the period, `&latest=1` for the teaser, `&run=id` for one exact snapshot), cached for 10 minutes like `/series`; the runs carrying points are thinned to ≤100 per provider (newest always kept), while the metadata index behind the snapshot table stays complete. The accuracy section body is served by `GET /forecasts/accuracy?from=date` so the period switch can rescore it without a reload.
+![Forecasts page](docs/forecasts.jpg)
+
+Everything forecast-related lives on the `/forecasts` page (the dashboard keeps only a compact teaser card with each source's nearest prediction). One currency + period + source switch drives four views over the same snapshots: forecast-over-fact chart (dashed lines, АПЭКОН with a shaded corridor, a slider + play button replaying versions at ~600 ms, auto-play disabled under `prefers-reduced-motion`), a fan of all versions at once (newer = brighter), a revision chart for one chosen horizon date (with the CBR fact line once the date has passed), and the accuracy block. The period switch (default 90 days, plus a «Свой» custom from–to range in a small popover — same as on the dashboard) bounds the fact line and the snapshot capture dates — the forecast part of the main chart always shows in full. Data comes from `GET /forecasts/data?currency=USD` (optionally `&provider=apecon`, `&from=date&to=date` for the period, `&latest=1` for the teaser, `&run=id` for one exact snapshot), cached for 10 minutes like `/series`; the runs carrying points are thinned to ≤100 per provider (newest always kept), while the metadata index behind the snapshot table stays complete. The accuracy section body is served by `GET /forecasts/accuracy?from=date&to=date` so the period switch can rescore it without a reload.
 
 **Accuracy**: every matured forecast point (horizon date passed, CBR fact exists, and the prediction was made *before* the date) is scored per provider and currency — comparisons count, MAE in ₽, MAPE in %, bucketed by lead time (≤7 / 8–30 / 30+ days). Deliberately no headline totals: the providers forecast different horizons, so only buckets where both have matured points are marked comparable; the rest are dimmed. No invented numbers — until forecasts mature, the block says so.
 
@@ -101,7 +131,10 @@ The page embeds only the initial series; every switch fetches `GET /series?curre
 - `/` — currency cards (each labeled with its source and date), chart with currency / period / multi-source switches, a divergence readout for the latest date the sources share, a forecast teaser card linking to `/forecasts`, converter, history table with a source column and filter.
 - `/forecasts` — the four forecast views described above plus a paginated table of every stored snapshot (a row click puts that version on the main chart).
 - `/sources` — provider health (last status, success share of the last 20 attempts, mean response time) plus data coverage per provider, and a paginated fetch log with provider/status filters.
+- `/about` — a plain-language explainer (reachable from the top bar): what the site shows, where the data comes from, how the forecast and its honest accuracy work. No operational details.
 - `/admin` — see above.
+
+Right after a fresh deploy, while the tables are still empty, the dashboard, forecasts and sources pages lead with a calm first-run notice instead of blank charts; it disappears once the first refresh lands.
 
 ## Deploy (Render + Supabase)
 
@@ -123,7 +156,7 @@ Supabase offers three connection strings; only one of them is right here:
    - `RAILS_MASTER_KEY` — the contents of your local `config/master.key` (one line; it is gitignored, which is why Render must be told it);
    - `CRON_TOKEN` — any long random string (`openssl rand -hex 24`);
    - `ADMIN_USER`, `ADMIN_PASSWORD` — credentials for `/admin`.
-   `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
+   `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES`, `RAILS_MAX_THREADS` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
 3. **First data** (the tables are empty): open `https://<app>.onrender.com/admin`, sign in and press, in order, «Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow» — that seeds the site with a live last year of data. The long tasks (full archive and forecast backtest) are too slow for a web request and the free Render tier has no shell, so run them **locally against the production database** — the session pooler string works from a laptop too:
 
    ```sh
@@ -138,3 +171,18 @@ Supabase offers three connection strings; only one of them is right here:
 5. **Custom domain later**: add it in Render, then set `APP_HOST` to that domain so Rails' host allowlist accepts it.
 
 **Free-tier sleep**: Render suspends a free service after ~15 minutes of no traffic, and the next request waits several seconds while it wakes. The scheduler calls above double as keep-alive pings — with them the app is asleep at most between cron hits, and the health check `/up` never redirects to HTTPS so wake-ups stay cheap.
+
+## Limitations
+
+Honest list of what this project does **not** do:
+
+- **Four currencies only** (USD, EUR, CNY, GBP) against the ruble — adding one means touching `Rate::CURRENCIES` and the АПЭКОН page list, not a config file.
+- **The internal forecast is deliberately simple** — a rolling mean with a widening corridor, there to demonstrate versioning and honest accuracy scoring, not to beat anyone. The accuracy block exists precisely so you can see how simple it is.
+- **Data can lag.** Everything updates on an external scheduler's cadence (hours, not seconds); АПЭКОН is refreshed one currency per call to respect its 10-second crawl delay. This is a daily-rates site, not a live ticker.
+- **Free hosting sleeps.** On Render's free tier the first request after a quiet stretch takes a few seconds while the service wakes; the cron pings keep this rare.
+- **Backtested internal accuracy is a replay**, not archived live predictions — the model re-run over past facts with no peeking. The UI and the accuracy block say so where it matters.
+- **No accounts, no API guarantees, no investment advice.**
+
+## License
+
+[MIT](LICENSE) © Elizaveta Trapeznikova.
