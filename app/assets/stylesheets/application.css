@@ -205,6 +205,46 @@ svg.icon { flex: none; }
 .page-title { font-size: 22px; }
 .page-sub { color: var(--text-2); margin-top: 4px; }
 
+/* ---------- Forecasts page: hero header & section framing ---------- */
+
+/* Header card with the page-wide filters built in. The two glows echo the
+   chart accents: blue — our model, orange — АПЭКОН. */
+/* No overflow:hidden here — the custom-period popup must hang out of the
+   card; the glows are clipped by the ::before's own border-radius instead. */
+.hero { position: relative; padding: 22px 22px 18px; display: grid; gap: 18px; }
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 240px at 10% -30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(460px 220px at 95% 140%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 70%);
+}
+.hero > * { position: relative; min-width: 0; }
+.hero .page-title { font-size: 24px; }
+.hero__controls { border-top: 1px solid var(--line); padding-top: 16px; }
+
+.section__badge {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.section__badge .icon { width: 16px; height: 16px; }
+.section__desc { color: var(--text-3); font-size: 12px; line-height: 1.5; max-width: 78ch; margin-top: -4px; }
+
+/* The lead chart gets its own faint glow so it reads as the page's centerpiece. */
+.chart-card--hero {
+  background:
+    radial-gradient(640px 220px at 10% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%)
+    var(--card);
+}
+
 /* ---------- Currency cards ---------- */
 
 .cards {
@@ -405,6 +445,9 @@ svg.icon { flex: none; }
 /* Pin the heads to the top and stretch the cards, so both columns line up
    even when their content heights differ. */
 .duo > .section { grid-template-rows: auto 1fr; align-content: stretch; }
+/* Forecasts' version charts pair adds a note row between head and card,
+   so both cards still bottom-align regardless of how the notes wrap. */
+.duo--charts > .section { grid-template-rows: auto auto 1fr; }
 
 .panel { padding: 16px; display: grid; gap: 12px; align-content: start; }
 /* The duo stretches both cards to one height; --fill pins the marked
@@ -646,7 +689,6 @@ button.pager__link { border: 0; background: none; cursor: pointer; }
 }
 .about--note .section__badge { background: color-mix(in srgb, var(--accent-2) 18%, transparent); }
 .about--note .section__badge .icon { color: var(--accent-2); }
-
 
 /* ---------- Responsive ---------- */
 

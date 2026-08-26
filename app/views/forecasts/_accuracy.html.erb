@@ -5,10 +5,10 @@
     can refetch them from GET /forecasts/accuracy without touching the shell. %>
 <section class="section">
   <div class="section__head">
-    <%= render "shared/icon", name: "target" %>
+    <span class="section__badge"><%= render "shared/icon", name: "target" %></span>
     <h2 class="section__title">Точность прогнозов</h2>
   </div>
-  <p class="panel__note">Подсвечены корзины, где сбывшиеся точки есть у обоих провайдеров: чем дальше горизонт,
+  <p class="section__desc">Подсвечены корзины, где сбывшиеся точки есть у обоих провайдеров: чем дальше горизонт,
     тем больше ошибка у любой модели, поэтому числа из разных корзин между собой не сравниваются.</p>
   <div data-forecasts-target="accuracyBox">
     <%= render "accuracy_groups", accuracy: accuracy, scoped: true %>

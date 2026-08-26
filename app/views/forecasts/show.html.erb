@@ -5,29 +5,32 @@
 <% end %>
 
 <div data-controller="forecasts" class="page" style="padding:0">
-  <div>
-    <h1 class="page-title">Прогнозы курса</h1>
-    <p class="page-sub">Снимки прогнозов АПЭКОН и модели Rateflow поверх факта ЦБ РФ: версии, их дрейф и точность</p>
-  </div>
-
-  <%# Shared controls: every block below obeys the same currency, period and source choice. %>
-  <div class="controls">
-    <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, "#{currency_symbol(c)} #{c}"] } %>
-    <div class="popover-anchor">
-      <%= render "shared/segment", scope: "forecasts", key: "period", label: "Период",
-                 options: [[30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>
-      <%= render "shared/range_popover", scope: "forecasts" %>
+  <header class="card hero">
+    <div>
+      <h1 class="page-title">Прогнозы курса</h1>
+      <p class="page-sub">Снимки прогнозов АПЭКОН и модели Rateflow поверх факта ЦБ РФ: версии, их дрейф и точность</p>
     </div>
-    <%= render "shared/segment", scope: "forecasts", key: "source", label: "Источники",
-               options: [["apecon", "АПЭКОН"], ["internal", "Rateflow"], ["both", "Оба"]] %>
-  </div>
+    <%# Shared controls: every block below obeys the same currency, period and source choice. %>
+    <div class="hero__controls controls">
+      <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, "#{currency_symbol(c)} #{c}"] } %>
+      <div class="popover-anchor">
+        <%= render "shared/segment", scope: "forecasts", key: "period", label: "Период",
+                   options: [[30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>
+        <%= render "shared/range_popover", scope: "forecasts" %>
+      </div>
+      <%= render "shared/segment", scope: "forecasts", key: "source", label: "Источники",
+                 options: [["apecon", "АПЭКОН"], ["internal", "Rateflow"], ["both", "Оба"]] %>
+    </div>
+  </header>
 
   <section class="section">
     <div class="section__head">
-      <%= render "shared/icon", name: "chart" %>
+      <span class="section__badge"><%= render "shared/icon", name: "chart" %></span>
       <h2 class="section__title">Прогноз поверх факта</h2>
     </div>
-    <div class="card chart-card">
+    <p class="section__desc">Свежая версия прогноза каждого источника продолжает фактическую линию ЦБ РФ.
+      Плеер под графиком проигрывает прошлые версии — видно, что обещали раньше.</p>
+    <div class="card chart-card chart-card--hero">
       <div class="chart-wrap"><canvas data-forecasts-target="mainCanvas" role="img" aria-label="Прогноз поверх фактического курса"></canvas></div>
       <div class="playback" data-forecasts-target="playback" hidden>
         <button type="button" class="playback__btn" data-forecasts-target="playBtn" data-action="forecasts#togglePlay"
@@ -41,43 +44,50 @@
     </div>
   </section>
 
-  <section class="section">
-    <div class="section__head">
-      <%= render "shared/icon", name: "trend" %>
-      <h2 class="section__title">Веер версий</h2>
-    </div>
-    <div class="card chart-card">
-      <div class="chart-wrap"><canvas data-forecasts-target="fanCanvas" role="img" aria-label="Все версии прогноза одним веером"></canvas></div>
-      <div class="status-line" data-forecasts-target="fanStatus"></div>
-    </div>
-  </section>
-
-  <%# The page's most telling block: not the forecast itself but how it was
-      revised — X is the snapshot date, Y is what was predicted back then for
-      one fixed horizon date. %>
-  <section class="section">
-    <div class="section__head">
-      <%= render "shared/icon", name: "convert" %>
-      <h2 class="section__title">Как менялся прогноз на дату</h2>
-      <div class="section__aside filters">
-        <label class="control__label" for="horizon-date">Дата</label>
-        <select id="horizon-date" class="select" data-forecasts-target="horizonSelect" data-action="forecasts#setHorizon"></select>
+  <div class="duo duo--charts">
+    <section class="section">
+      <div class="section__head">
+        <span class="section__badge"><%= render "shared/icon", name: "trend" %></span>
+        <h2 class="section__title">Веер версий</h2>
       </div>
-    </div>
-    <div class="card chart-card">
-      <div class="chart-wrap"><canvas data-forecasts-target="revisionCanvas" role="img" aria-label="История пересмотров прогноза на выбранную дату"></canvas></div>
-      <div class="legend" data-forecasts-target="revisionLegend"></div>
-      <div class="status-line" data-forecasts-target="revisionStatus"></div>
-    </div>
-  </section>
+      <p class="section__desc">Все сохранённые версии одним пучком: чем свежее версия, тем плотнее цвет —
+        видно, куда дрейфует прогноз.</p>
+      <div class="card chart-card">
+        <div class="chart-wrap"><canvas data-forecasts-target="fanCanvas" role="img" aria-label="Все версии прогноза одним веером"></canvas></div>
+        <div class="status-line" data-forecasts-target="fanStatus"></div>
+      </div>
+    </section>
+
+    <%# The page's most telling block: not the forecast itself but how it was
+        revised — X is the snapshot date, Y is what was predicted back then for
+        one fixed horizon date. %>
+    <section class="section">
+      <div class="section__head">
+        <span class="section__badge"><%= render "shared/icon", name: "convert" %></span>
+        <h2 class="section__title">Как менялся прогноз на дату</h2>
+        <div class="section__aside filters">
+          <label class="control__label" for="horizon-date">Дата</label>
+          <select id="horizon-date" class="select" data-forecasts-target="horizonSelect" data-action="forecasts#setHorizon"></select>
+        </div>
+      </div>
+      <p class="section__desc">X — день снимка, Y — что в тот день обещали на выбранную дату:
+        история пересмотров одного обещания.</p>
+      <div class="card chart-card">
+        <div class="chart-wrap"><canvas data-forecasts-target="revisionCanvas" role="img" aria-label="История пересмотров прогноза на выбранную дату"></canvas></div>
+        <div class="legend" data-forecasts-target="revisionLegend"></div>
+        <div class="status-line" data-forecasts-target="revisionStatus"></div>
+      </div>
+    </section>
+  </div>
 
   <%= render "accuracy", accuracy: @accuracy %>
 
   <section class="section">
     <div class="section__head">
-      <%= render "shared/icon", name: "table" %>
+      <span class="section__badge"><%= render "shared/icon", name: "table" %></span>
       <h2 class="section__title">Снимки прогнозов</h2>
     </div>
+    <p class="section__desc">Каждая строка — сохранённая версия прогноза; клик по строке кладёт её на главный график.</p>
     <div class="card table-wrap snapshots">
       <table>
         <thead>
