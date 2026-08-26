@@ -2,6 +2,8 @@
 
 Public dashboard of USD, EUR, CNY and GBP exchange rates against the Russian ruble: full history back to 1999 from four independent sources, interactive charts, versioned forecasts (АПЭКОН monthly + our own rolling mean) with history playback and accuracy scoring, a converter, and a log of every call made to the data sources.
 
+**Live: [rateflow-forecast.onrender.com](https://rateflow-forecast.onrender.com)**
+
 ![Rateflow dashboard](docs/screenshot.jpg)
 
 ## Stack
