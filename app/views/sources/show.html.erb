@@ -91,7 +91,7 @@
             <td class="num muted"><%= log.http_status || "—" %></td>
             <td class="num"><%= log.duration_ms %></td>
             <td class="num"><%= log.records_count %></td>
-            <td class="wrap"><%= log.error_message.presence || "—" %></td>
+            <td class="wrap"><%= redacted_error(log.error_message) %></td>
           </tr>
         <% end %>
       </tbody>

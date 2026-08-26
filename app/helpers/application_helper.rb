@@ -45,6 +45,17 @@ module ApplicationHelper
 
   def date_ru(date) = date&.strftime("%d.%m.%Y")
 
+  # Provider errors often quote the URL that failed, query string and all.
+  # Those parameters are noise on a public page at best, so the log shows the
+  # address without them.
+  URL_QUERY = %r{(https?://[^\s?]+)\?\S*}
+
+  def redacted_error(text)
+    return "—" if text.blank?
+
+    text.gsub(URL_QUERY, '\1?…')
+  end
+
   # Donut ring for a 0–100 percentage with the number in the middle.
   # The arc starts at 12 o'clock and is drawn with stroke-dasharray.
   def donut(pct, size: 48, stroke: 5)
