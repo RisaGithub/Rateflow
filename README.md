@@ -71,6 +71,8 @@ GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stal
 
 - Token from `ENV["CRON_TOKEN"]`, compared with `secure_compare`. No token configured → 503; wrong token → 401.
 - The same update having run less than 10 minutes ago → `{"status":"skipped"}` with no network calls.
+- Both endpoints (and `/admin`) are rate-limited to 20 requests per minute per IP; past that the answer is 429.
+- The day's first successful `/cron/refresh` also prunes housekeeping data (see `logs:prune` below), so no separate cleanup scheduler is needed.
 - `/cron/forecasts` touches **one** currency per call (АПЭКОН's 10 s crawl delay makes four too slow for one request). Schedule it ~4 times a day and every currency rotates through within a day.
 
 Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
@@ -88,6 +90,7 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 - `rake rates:fetch` — same as `/cron/refresh`, from the console.
 - `rake rates:backfill[from]` — one-off archive load: CBR in year-sized slices per currency since `from` (default 1999-01-01), Currency API sampled weekly over the last two years, 300 ms pause between requests.
+- `rake logs:prune[days]` — housekeeping (also run automatically once a day by `/cron/refresh`). Deletes fetch-log rows older than `days` (default 90) — the sources page only ever shows recent attempts, so an unbounded journal is pure dead weight — and internal forecast snapshots older than a year, which lose nothing because the model is deterministic and `forecasts:backtest` can replay them from CBR facts at any moment. АПЭКОН snapshots are **never** deleted: they were scraped at a point in time and cannot be recovered.
 
 ### Serving the chart
 

@@ -21,6 +21,7 @@ class CronController < ApplicationController
 
     started = now_ms
     written = RatesFetcher.new.call
+    prune_logs_daily
     render json: { status: "ok", kind: "rates", rows_written: written, duration_ms: now_ms - started }
   end
 
@@ -48,6 +49,15 @@ class CronController < ApplicationController
       render json: { error: "CRON_TOKEN is not configured" }, status: :service_unavailable
     elsif !ActiveSupport::SecurityUtils.secure_compare(params[:token].to_s, secret)
       render json: { error: "Unauthorized" }, status: :unauthorized
+    end
+  end
+
+  # The day's first successful refresh also prunes old fetch logs and stale
+  # internal snapshots (see LogsPruner) — no separate scheduler needed. The
+  # cache marker vanishes on restart, but an extra prune is a cheap no-op.
+  def prune_logs_daily
+    Rails.cache.fetch("logs-pruned-#{Date.current.iso8601}", expires_in: 25.hours) do
+      LogsPruner.new.call
     end
   end
 
