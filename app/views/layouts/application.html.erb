@@ -7,10 +7,10 @@
     <meta name="description" content="Курсы валют к рублю: история, графики и журнал источников данных">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <script>
+    <%= javascript_tag nonce: true do %>
       // Apply the saved theme before first paint to avoid a flash of the wrong theme.
       (function () { try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {} })();
-    </script>
+    <% end %>
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

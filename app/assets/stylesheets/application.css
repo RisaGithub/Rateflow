@@ -119,6 +119,8 @@ svg.icon { flex: none; }
 }
 
 .page { padding: 28px 24px 48px; display: grid; gap: 24px; }
+/* A .page nested inside the layout's .page: the outer one already pads. */
+.page--flush { padding: 0; }
 
 /* ---------- Top bar ---------- */
 
