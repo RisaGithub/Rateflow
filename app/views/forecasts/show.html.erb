@@ -23,6 +23,12 @@
     </div>
   </header>
 
+  <% if @no_snapshots %>
+    <%= render "shared/empty_notice",
+               text: "Снимков прогнозов ещё нет: АПЭКОН и модель Rateflow сохраняют свои версии при плановых " \
+                     "обновлениях, так что графики и таблица заполнятся в течение первого дня работы." %>
+  <% end %>
+
   <section class="section">
     <div class="section__head">
       <span class="section__badge"><%= render "shared/icon", name: "chart" %></span>

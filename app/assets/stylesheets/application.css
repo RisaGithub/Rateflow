@@ -247,6 +247,11 @@ svg.icon { flex: none; }
     var(--card);
 }
 
+/* First-run notice: the database is empty until the first refresh runs. */
+.empty-notice { display: flex; gap: 12px; padding: 16px; align-items: flex-start; }
+.empty-notice__title { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
+.empty-notice__text { color: var(--text-2); font-size: 12px; margin-top: 4px; max-width: 78ch; }
+
 /* ---------- Currency cards ---------- */
 
 .cards {

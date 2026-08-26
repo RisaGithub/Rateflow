@@ -2,6 +2,9 @@ class SourcesController < ApplicationController
   PER_PAGE = 50
 
   def show
+    # Fresh deploy: not a single fetch attempt yet — lead with a first-run
+    # notice so the all-grey provider cards don't read as breakage.
+    @first_run = FetchLog.none?
     @providers = Rate::PROVIDERS.map { |key| ProviderStatus.new(key) }
     @provider = params[:provider].presence_in(Rate::PROVIDERS)
     @status = params[:status].presence_in(%w[ok fail])

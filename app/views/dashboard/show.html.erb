@@ -10,6 +10,12 @@
     <p class="page-sub">USD, EUR, CNY и GBP из четырёх независимых источников: ЦБ РФ, ER-API, Currency API и АПЭКОН</p>
   </div>
 
+  <% if @dashboard.empty? %>
+    <%= render "shared/empty_notice",
+               text: "База только что развёрнута: курсы подтянутся с первым плановым обновлением, " \
+                     "обычно в течение пары часов. После этого здесь появятся карточки валют, график и история." %>
+  <% end %>
+
   <section class="cards" aria-label="Валюты">
     <% @dashboard.cards.each do |card| %>
       <%= render "card", card: card %>

@@ -12,6 +12,9 @@ class ForecastsController < ApplicationController
   # toggle visibility, the period switch refetches #accuracy.
   def show
     @accuracy = accuracy_reports(DEFAULT_PERIOD_DAYS.days.ago.to_date)
+    # Fresh deploy: no snapshots at all — the page leads with a first-run
+    # notice instead of four blocks of empty charts.
+    @no_snapshots = ForecastRun.none?
   end
 
   def data

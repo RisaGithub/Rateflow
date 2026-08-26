@@ -1,0 +1,9 @@
+<%# A calm first-run explainer: shown while the database is still empty,
+    right after a fresh deploy, instead of bare dashes and blank charts. %>
+<div class="card empty-notice" role="status">
+  <span class="section__badge"><%= render "shared/icon", name: "info" %></span>
+  <div>
+    <div class="empty-notice__title">Данных пока нет</div>
+    <p class="empty-notice__text"><%= text %></p>
+  </div>
+</div>

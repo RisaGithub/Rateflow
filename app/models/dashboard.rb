@@ -13,6 +13,10 @@ class Dashboard
     @cards ||= Rate::CURRENCIES.map { |cur| card(cur) }
   end
 
+  # True right after a fresh deploy: no provider has delivered anything yet,
+  # so the page shows a first-run notice instead of bare dashes.
+  def empty? = cards.none?(&:value)
+
   # { "USD" => { value:, provider:, date: }, ... } — the rate each card shows,
   # so the converter and the forecast teaser can name what they compare against.
   def latest_rates

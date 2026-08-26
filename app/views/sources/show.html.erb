@@ -5,6 +5,12 @@
   <p class="page-sub">Состояние провайдеров и журнал обращений</p>
 </div>
 
+<% if @first_run %>
+  <%= render "shared/empty_notice",
+             text: "Обращений к источникам ещё не было: статусы провайдеров и журнал заполнятся " \
+                   "после первого планового обновления." %>
+<% end %>
+
 <section class="section">
   <div class="section__head">
     <%= render "shared/icon", name: "source" %>
