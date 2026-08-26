@@ -5,7 +5,7 @@
 # Supabase database (Frankfurt) and cannot be changed once the service exists.
 services:
   - type: web
-    name: rateflow-fx
+    name: rateflow-forecast
     region: frankfurt
     runtime: ruby
     plan: free
