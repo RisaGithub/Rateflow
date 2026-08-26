@@ -132,8 +132,10 @@ svg.icon { flex: none; }
 .nav__link:hover { background: var(--hover); color: var(--text); }
 .nav__link[aria-current="page"] { color: var(--text); background: var(--accent-soft); }
 
-.theme-toggle {
-  margin-left: auto;
+.topbar__tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* Square control shared by the "About" link and the theme switch. */
+.icon-btn {
   width: 34px;
   height: 34px;
   display: grid;
@@ -143,8 +145,13 @@ svg.icon { flex: none; }
   background: var(--card);
   cursor: pointer;
 }
-.theme-toggle:hover { border-color: var(--line-strong); }
-.theme-toggle .icon { grid-area: 1 / 1; color: var(--text-2); }
+.icon-btn:hover { border-color: var(--line-strong); }
+.icon-btn .icon { color: var(--text-2); }
+.icon-btn[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent-soft); }
+.icon-btn[aria-current="page"] .icon { color: var(--accent); }
+
+/* The sun and the moon share one cell; only one of them is ever shown. */
+.theme-toggle .icon { grid-area: 1 / 1; }
 .theme-toggle__moon { display: none; }
 :root[data-theme="dark"] .theme-toggle__moon { display: block; }
 :root[data-theme="dark"] .theme-toggle__sun { display: none; }
@@ -551,6 +558,35 @@ button.pager__link { border: 0; background: none; cursor: pointer; }
   font-size: 12px;
   border-top: 1px solid var(--line);
 }
+.footer a { color: var(--text-2); }
+.footer a:hover { color: var(--text); text-decoration: underline; }
+
+/* ---------- About page ---------- */
+
+/* Plain prose cards: a reading measure keeps lines short on wide screens. */
+.about { padding: 18px; display: grid; gap: 10px; align-content: start; }
+.about p, .about li { color: var(--text-2); max-width: 78ch; }
+.about ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.about b { color: var(--text); font-weight: 500; }
+.about a { color: var(--accent); }
+.about a:hover { text-decoration: underline; }
+.about--table { padding: 18px 0 0; gap: 0; }
+.about--table .section__head, .about--table .panel__note { padding: 0 18px; }
+.about--table .panel__note { padding-top: 12px; padding-bottom: 18px; }
+.about--table .about__table { margin-top: 14px; }
+.about__table th:first-child, .about__table td:first-child { padding-left: 18px; }
+.about__table th:last-child, .about__table td:last-child { padding-right: 18px; }
+.about__table td { color: var(--text-2); }
+.about__table td:first-child { color: var(--text); }
+
+/* Quiet warning card: readable, not alarming. */
+.about--note {
+  border-color: color-mix(in srgb, var(--accent-2) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-2) 8%, var(--card));
+}
+.about--note .section__badge { background: color-mix(in srgb, var(--accent-2) 18%, transparent); }
+.about--note .section__badge .icon { color: var(--accent-2); }
+
 
 /* ---------- Responsive ---------- */
 

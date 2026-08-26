@@ -32,10 +32,16 @@
           <%= link_to "Прогнозы", forecasts_path, class: "nav__link", "aria-current": (current_page?(forecasts_path) ? "page" : nil) %>
           <%= link_to "Источники", sources_path, class: "nav__link", "aria-current": (current_page?(sources_path) ? "page" : nil) %>
         </nav>
-        <button type="button" class="theme-toggle" data-controller="theme" data-action="theme#toggle" aria-label="Переключить тему" title="Переключить тему">
-          <%= render "shared/icon", name: "sun", class: "theme-toggle__sun" %>
-          <%= render "shared/icon", name: "moon", class: "theme-toggle__moon" %>
-        </button>
+        <div class="topbar__tools">
+          <%= link_to about_path, class: "icon-btn", "aria-label": "О проекте", title: "О проекте",
+                      "aria-current": (current_page?(about_path) ? "page" : nil) do %>
+            <%= render "shared/icon", name: "info" %>
+          <% end %>
+          <button type="button" class="icon-btn theme-toggle" data-controller="theme" data-action="theme#toggle" aria-label="Переключить тему" title="Переключить тему">
+            <%= render "shared/icon", name: "sun", class: "theme-toggle__sun" %>
+            <%= render "shared/icon", name: "moon", class: "theme-toggle__moon" %>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -47,7 +53,7 @@
     </main>
 
     <footer class="container footer">
-      <span>Rateflow · данные ЦБ РФ, open.er-api.com, Currency API и АПЭКОН</span>
+      <span>Rateflow · данные ЦБ РФ, open.er-api.com, Currency API и АПЭКОН · <%= link_to "О проекте", about_path %></span>
       <span class="mono"><%= Date.current.strftime("%Y") %></span>
     </footer>
   </body>
