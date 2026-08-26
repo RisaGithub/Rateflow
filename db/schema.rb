@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_061538) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -48,6 +48,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120001) do
     t.string "source_url"
     t.datetime "updated_at", null: false
     t.index ["provider", "currency", "captured_at"], name: "index_forecast_runs_on_provider_and_currency_and_captured_at"
+    t.index ["updated_at"], name: "index_forecast_runs_on_updated_at"
   end
 
   create_table "rates", force: :cascade do |t|
@@ -58,6 +59,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120001) do
     t.datetime "updated_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.decimal "value", precision: 12, scale: 4, null: false
     t.index ["currency", "provider", "on_date"], name: "index_rates_on_currency_and_provider_and_on_date", unique: true
+    t.index ["updated_at"], name: "index_rates_on_updated_at"
   end
 
   add_foreign_key "forecast_points", "forecast_runs", on_delete: :cascade
