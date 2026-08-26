@@ -119,6 +119,8 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 ### Rake tasks
 
 - `rake rates:fetch` — same as `/cron/refresh`, from the console.
+- `rake forecasts:fetch[currency]` — АПЭКОН forecasts from the console: one currency, or (without the argument) all four in turn with the site's mandatory 10-second pause between page loads (~1 min). Same code path as `/cron/forecasts`, so today's АПЭКОН quote lands in `rates` along the way and a currency refreshed less than a day ago is skipped.
+- `rake forecasts:backtest[days]` — replays the internal forecast daily over the last `days` (default 180) of CBR facts; deterministic and idempotent.
 - `rake rates:backfill[from]` — one-off archive load: CBR in year-sized slices per currency since `from` (default 1999-01-01), Currency API sampled weekly over the last two years, 300 ms pause between requests.
 - `rake logs:prune[days]` — housekeeping (also run automatically once a day by `/cron/refresh`). Deletes fetch-log rows older than `days` (default 90) — the sources page only ever shows recent attempts, so an unbounded journal is pure dead weight — and internal forecast snapshots older than a year, which lose nothing because the model is deterministic and `forecasts:backtest` can replay them from CBR facts at any moment. АПЭКОН snapshots are **never** deleted: they were scraped at a point in time and cannot be recovered.
 
@@ -157,20 +159,27 @@ Supabase offers three connection strings; only one of them is right here:
    - `CRON_TOKEN` — any long random string (`openssl rand -hex 24`);
    - `ADMIN_USER`, `ADMIN_PASSWORD` — credentials for `/admin`.
    `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES`, `RAILS_MAX_THREADS` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
-3. **First data** (the tables are empty): open `https://<app>.onrender.com/admin`, sign in and press, in order, «Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow» — that seeds the site with a live last year of data. The long tasks (full archive and forecast backtest) are too slow for a web request and the free Render tier has no shell, so run them **locally against the production database** — the session pooler string works from a laptop too:
-
-   ```sh
-   DATABASE_URL="postgresql://...pooler.supabase.com:5432/postgres" RAILS_ENV=production \
-     bin/rails "rates:backfill[1999-01-01]"   # ~5 min
-   DATABASE_URL="postgresql://...pooler.supabase.com:5432/postgres" RAILS_ENV=production \
-     bin/rails "forecasts:backtest[180]"      # seconds
-   ```
+3. **First data** (the tables are empty): either press the `/admin` buttons in order («Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow») for a live last year, or — better — run the full seed from a laptop as described in the next section. The long tasks (full archive and forecast backtest) are too slow for a web request, and the free Render tier has no shell, so the laptop route (see [Seeding the production database from a laptop](#seeding-the-production-database-from-a-laptop)) is the only way to get the complete 1999-onwards archive.
 4. **Scheduler** (e.g. cron-job.org): two GET jobs with the token from step 2 —
    - `https://<app>.onrender.com/cron/refresh?token=…` every 6 hours;
    - `https://<app>.onrender.com/cron/forecasts?token=…` 4 times a day (each call refreshes one АПЭКОН currency, so all four rotate through daily).
 5. **Custom domain later**: add it in Render, then set `APP_HOST` to that domain so Rails' host allowlist accepts it.
 
 **Free-tier sleep**: Render suspends a free service after ~15 minutes of no traffic, and the next request waits several seconds while it wakes. The scheduler calls above double as keep-alive pings — with them the app is asleep at most between cron hits, and the health check `/up` never redirects to HTTPS so wake-ups stay cheap.
+
+### Seeding the production database from a laptop
+
+The session pooler string works from a laptop too, so anything too slow for a web request runs locally against Supabase. `bin/prod` makes that a one-word prefix: it reads `DATABASE_URL` from `.env.production.local` (git-ignored; create it at the repo root with that single line — the session pooler URI, **not** Direct, which is IPv6-only) and runs any command with `RAILS_ENV=production`:
+
+```sh
+bin/prod rails db:migrate                    # schema, if not migrated yet
+bin/prod rake rates:fetch                    # quick write check: recent rates
+bin/prod rake "rates:backfill[1999-01-01]"   # full CBR archive, ~5 min
+bin/prod rake "forecasts:backtest[180]"      # historical internal snapshots, seconds
+bin/prod rake forecasts:fetch                # АПЭКОН, all four currencies, ~1 min
+```
+
+Every task is idempotent (rows are upserted, snapshots dedup) — if a step dies half-way, just rerun that step. If the connection refuses: make sure the string is from the **Session pooler** tab, try appending `?sslmode=require`, and URL-encode any special characters in the password. `bin/prod rails server` also works for a final look at the real data before sharing the link — remember that you are then writing to the production database.
 
 ## Limitations
 

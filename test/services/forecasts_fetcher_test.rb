@@ -91,6 +91,33 @@ class ForecastsFetcherTest < ActiveSupport::TestCase
     assert_empty provider.fetched
   end
 
+  test "fetch_all walks the currencies in order, pausing between page loads" do
+    provider = FakeProvider.new
+    slept = []
+
+    results = ForecastsFetcher.fetch_all(currencies: %w[USD EUR], provider: provider,
+                                         sleeper: ->(s) { slept << s })
+
+    assert_equal %w[USD EUR], provider.fetched
+    assert_equal [ ForecastsFetcher::CRAWL_DELAY ], slept
+    assert_equal %w[ok ok], results.map { |r| r[:status] }
+    assert_equal %w[USD EUR], results.map { |r| r[:currency] }
+    assert_equal 2, Rate.where(provider: "apecon").count
+  end
+
+  test "fetch_all never pauses after a fresh currency — no request was made" do
+    store("USD", 2.hours.ago)
+    provider = FakeProvider.new
+    slept = []
+
+    results = ForecastsFetcher.fetch_all(currencies: %w[USD EUR], provider: provider,
+                                         sleeper: ->(s) { slept << s })
+
+    assert_equal %w[EUR], provider.fetched
+    assert_empty slept
+    assert_equal [ %w[USD fresh], %w[EUR ok] ], results.map { |r| [ r[:currency], r[:status] ] }
+  end
+
   test "provider failure lands in FetchLog and is reported, not raised" do
     provider = FakeProvider.new(error: Providers::Error.new("HTTP 500", http_status: 500))
 

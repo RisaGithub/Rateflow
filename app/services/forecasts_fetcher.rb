@@ -11,6 +11,22 @@
 # never re-fetched (не чаще раза в сутки на валюту).
 class ForecastsFetcher
   MIN_AGE = 24.hours
+  CRAWL_DELAY = 10 # seconds between АПЭКОН page loads, per its robots.txt
+
+  # Refreshes several currencies in one sitting — the laptop-side counterpart
+  # of hitting /cron/forecasts once per currency. Each iteration goes through
+  # the same single-currency #call (quote saved, attempt logged), pausing
+  # CRAWL_DELAY between page loads; a "fresh" result made no request, so no
+  # pause follows it. Returns one summary hash per currency, in order.
+  def self.fetch_all(currencies: Rate::CURRENCIES, provider: Providers::Apecon.new,
+                     delay: CRAWL_DELAY, sleeper: Kernel.method(:sleep))
+    results = []
+    currencies.each do |currency|
+      sleeper.call(delay) unless results.empty? || results.last[:status] == "fresh"
+      results << new(provider: provider, currencies: [ currency ]).call.merge(currency: currency)
+    end
+    results
+  end
 
   def initialize(provider: Providers::Apecon.new, currencies: Rate::CURRENCIES)
     @provider = provider

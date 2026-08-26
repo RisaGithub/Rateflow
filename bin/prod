@@ -1,0 +1,47 @@
+#!/bin/sh
+# Runs a command against the production (Supabase) database from this machine:
+#   bin/prod rails db:migrate
+#   bin/prod rake rates:fetch
+#
+# Reads DATABASE_URL from .env.production.local — a git-ignored file holding
+# that single line — and runs the given command with RAILS_ENV=production.
+# The two extra defaults below only matter for `bin/prod rails server`: they
+# let a local browser reach a production-mode Puma (host allowlist, static
+# assets). Anything already set in the environment is left untouched.
+set -eu
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+env_file="$root/.env.production.local"
+
+if [ ! -f "$env_file" ]; then
+  echo "bin/prod: $env_file not found." >&2
+  echo "Create it with a single line:  DATABASE_URL=postgresql://..." >&2
+  echo "(the Supabase session-pooler connection string; the file is git-ignored)" >&2
+  exit 1
+fi
+
+# Take the value verbatim after the first "DATABASE_URL=" — no shell sourcing,
+# so passwords with quotes, $, spaces or # survive as written.
+url="$(sed -n 's/^DATABASE_URL=//p' "$env_file" | head -n 1)"
+
+if [ -z "$url" ]; then
+  echo "bin/prod: $env_file has no DATABASE_URL line (or the value is empty)." >&2
+  echo "Expected a single line:  DATABASE_URL=postgresql://..." >&2
+  exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+  echo "usage: bin/prod <command> [args...]   e.g.  bin/prod rails db:migrate" >&2
+  exit 1
+fi
+
+export DATABASE_URL="$url"
+export RAILS_ENV=production
+export APP_HOST="${APP_HOST:-localhost}"
+export RAILS_SERVE_STATIC_FILES="${RAILS_SERVE_STATIC_FILES:-1}"
+
+# `bin/prod rails ...` should hit this repo's binstubs, not a global rails.
+export PATH="$root/bin:$PATH"
+
+cd "$root"
+exec "$@"
