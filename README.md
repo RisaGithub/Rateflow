@@ -142,6 +142,8 @@ Right after a fresh deploy, while the tables are still empty, the dashboard, for
 
 The repo ships a Render **Blueprint** (`render.yaml`): one Ruby web service, `bin/render-build.sh` as the build command (gems → assets → `db:migrate`, `errexit` so a broken step fails the deploy and the previous version stays live), Puma as the start command, health check on `/up`. The database lives on Supabase and reaches the app through `DATABASE_URL`.
 
+> **Before the first deploy**: the service's region and subdomain come from `render.yaml` (`region`, `name`) and are fixed at creation — Render does not let you change either afterwards, so a mistake means deleting and recreating the service. The blueprint pins `region: frankfurt` (next to the Supabase database) and `name: rateflow-fx` (the subdomain `rateflow-fx.onrender.com`).
+
 ### Which Supabase connection string — and why
 
 Supabase offers three connection strings; only one of them is right here:
@@ -161,8 +163,8 @@ Supabase offers three connection strings; only one of them is right here:
    `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES`, `RAILS_MAX_THREADS` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
 3. **First data** (the tables are empty): either press the `/admin` buttons in order («Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow») for a live last year, or — better — run the full seed from a laptop as described in the next section. The long tasks (full archive and forecast backtest) are too slow for a web request, and the free Render tier has no shell, so the laptop route (see [Seeding the production database from a laptop](#seeding-the-production-database-from-a-laptop)) is the only way to get the complete 1999-onwards archive.
 4. **Scheduler** (e.g. cron-job.org): two GET jobs with the token from step 2 —
-   - `https://<app>.onrender.com/cron/refresh?token=…` every 6 hours;
-   - `https://<app>.onrender.com/cron/forecasts?token=…` 4 times a day (each call refreshes one АПЭКОН currency, so all four rotate through daily).
+   - `https://rateflow-fx.onrender.com/cron/refresh?token=…` every 6 hours;
+   - `https://rateflow-fx.onrender.com/cron/forecasts?token=…` 4 times a day (each call refreshes one АПЭКОН currency, so all four rotate through daily).
 5. **Custom domain later**: add it in Render, then set `APP_HOST` to that domain so Rails' host allowlist accepts it.
 
 **Free-tier sleep**: Render suspends a free service after ~15 minutes of no traffic, and the next request waits several seconds while it wakes. The scheduler calls above double as keep-alive pings — with them the app is asleep at most between cron hits, and the health check `/up` never redirects to HTTPS so wake-ups stay cheap.

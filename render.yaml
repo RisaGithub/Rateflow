@@ -1,10 +1,12 @@
 # Render Blueprint: one Ruby web service. The database is NOT here — it lives
 # on Supabase; paste its *session pooler* connection string into DATABASE_URL
 # (see README, «Deploy»). Values marked sync: false are asked for once in the
-# Render dashboard and never stored in the repo.
+# Render dashboard and never stored in the repo. The region matches the
+# Supabase database (Frankfurt) and cannot be changed once the service exists.
 services:
   - type: web
-    name: rateflow
+    name: rateflow-fx
+    region: frankfurt
     runtime: ruby
     plan: free
     buildCommand: bin/render-build.sh
