@@ -5,6 +5,7 @@ class AdminControllerTest < ActionDispatch::IntegrationTest
     @old = ENV.values_at("ADMIN_USER", "ADMIN_PASSWORD")
     ENV["ADMIN_USER"] = "admin"
     ENV["ADMIN_PASSWORD"] = "pass"
+    AdminController::RATE_LIMIT_STORE.clear
   end
 
   teardown { ENV["ADMIN_USER"], ENV["ADMIN_PASSWORD"] = @old }
@@ -23,6 +24,14 @@ class AdminControllerTest < ActionDispatch::IntegrationTest
   test "wrong password gets 401" do
     get admin_path, headers: basic("admin", "nope")
     assert_response :unauthorized
+  end
+
+  test "more than 20 requests per minute from one address get 429" do
+    20.times { get admin_path, headers: basic("admin", "nope") }
+    assert_response :unauthorized
+
+    get admin_path, headers: basic("admin", "nope")
+    assert_response :too_many_requests
   end
 
   test "valid credentials see the database state" do

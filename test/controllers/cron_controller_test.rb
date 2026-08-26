@@ -13,6 +13,7 @@ class CronControllerTest < ActionDispatch::IntegrationTest
   setup do
     @old_token = ENV["CRON_TOKEN"]
     ENV["CRON_TOKEN"] = "s3cret"
+    CronController::RATE_LIMIT_STORE.clear
   end
 
   teardown { ENV["CRON_TOKEN"] = @old_token }
@@ -76,6 +77,15 @@ class CronControllerTest < ActionDispatch::IntegrationTest
     assert_equal "ok", body["status"]
     assert_equal "USD", body.dig("apecon", "currency")
     assert_equal 4, body["internal_snapshots"]
+  end
+
+  test "more than 20 requests per minute from one address get 429" do
+    20.times { get cron_refresh_path(token: "wrong") }
+    assert_response :unauthorized
+
+    get cron_refresh_path(token: "wrong")
+    assert_response :too_many_requests
+    assert_match "Too many requests", response.parsed_body["error"]
   end
 
   test "forecasts endpoint is throttled by its own kind of log" do

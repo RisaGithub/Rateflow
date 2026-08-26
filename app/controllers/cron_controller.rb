@@ -4,6 +4,12 @@
 class CronController < ApplicationController
   THROTTLE = 10.minutes
 
+  # A dedicated store instead of Rails.cache: the token check must stay
+  # brute-force-limited even where the app cache is a null store (tests).
+  RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
+
+  rate_limit to: 20, within: 1.minute, store: RATE_LIMIT_STORE,
+             with: -> { render json: { error: "Too many requests, try again in a minute" }, status: :too_many_requests }
   before_action :authenticate!
 
   # GET /cron/refresh?token=… — rates for the last 14 days from the three API

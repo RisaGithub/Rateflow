@@ -2,6 +2,12 @@
 # Basic with credentials straight from ENV — no gems, no user models. Missing
 # credentials switch the page off with a clear 503 instead of letting everyone in.
 class AdminController < ApplicationController
+  # A dedicated store instead of Rails.cache: the password check must stay
+  # brute-force-limited even where the app cache is a null store (tests).
+  RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
+
+  rate_limit to: 20, within: 1.minute, store: RATE_LIMIT_STORE,
+             with: -> { render plain: "Слишком много запросов — попробуйте через минуту.", status: :too_many_requests }
   before_action :authenticate!
 
   def show
