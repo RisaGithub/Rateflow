@@ -12,7 +12,7 @@
 
   <%# Shared controls: every block below obeys the same currency, period and source choice. %>
   <div class="controls">
-    <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
+    <%= render "shared/segment", scope: "forecasts", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, "#{currency_symbol(c)} #{c}"] } %>
     <div class="popover-anchor">
       <%= render "shared/segment", scope: "forecasts", key: "period", label: "Период",
                  options: [[30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>

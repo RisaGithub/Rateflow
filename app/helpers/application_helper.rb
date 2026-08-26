@@ -4,6 +4,10 @@ module ApplicationHelper
 
   def provider_name(key) = PROVIDER_NAMES.fetch(key, key)
 
+  CURRENCY_SYMBOLS = { "USD" => "$", "EUR" => "€", "CNY" => "¥", "GBP" => "£", "RUB" => "₽" }.freeze
+
+  def currency_symbol(code) = CURRENCY_SYMBOLS.fetch(code, code)
+
   # 71.5532 -> "71,5532"; Russian locale uses a decimal comma.
   def rub(value, precision: 4)
     return "—" if value.nil?

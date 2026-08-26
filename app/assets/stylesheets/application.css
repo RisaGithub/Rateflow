@@ -209,6 +209,21 @@ svg.icon { flex: none; }
 .ccard:hover { border-color: var(--line-strong); }
 .ccard[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
 
+.ccard__head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ccard__sym {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+}
 .ccard__code { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
 .ccard__name { color: var(--text-3); font-size: 12px; margin-top: 2px; }
 .ccard__value { grid-column: 1; font-size: 24px; font-weight: 500; line-height: 1.1; white-space: nowrap; }

@@ -1,8 +1,11 @@
 <button type="button" class="card ccard" data-dashboard-target="card" data-currency="<%= card.code %>"
         data-action="dashboard#selectCurrency" aria-pressed="false">
-  <div>
-    <div class="ccard__code"><%= card.code %></div>
-    <div class="ccard__name"><%= card.name %></div>
+  <div class="ccard__head">
+    <span class="ccard__sym" aria-hidden="true"><%= currency_symbol(card.code) %></span>
+    <div>
+      <div class="ccard__code"><%= card.code %></div>
+      <div class="ccard__name"><%= card.name %></div>
+    </div>
   </div>
   <% if card.value %>
     <div class="ccard__spark <%= trend_class(card.delta) %>"><%= sparkline(card.spark) %></div>
