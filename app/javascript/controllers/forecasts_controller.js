@@ -35,7 +35,8 @@ const thinEven = (items, max) => {
 // The period bounds the fact line and the snapshot capture dates — the
 // forecast part of the main chart always shows in full.
 export default class extends Controller {
-  static targets = ["seg", "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
+  static targets = ["seg", "range", "fromDate", "toDate",
+                    "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
                     "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
                     "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus",
                     "accuracyBox", "accuracyGroup", "accuracyCard",
@@ -44,7 +45,7 @@ export default class extends Controller {
   connect() {
     // period 90 mirrors ForecastsController::DEFAULT_PERIOD_DAYS — the
     // server pre-renders the accuracy block for the same window.
-    this.state = { currency: "USD", period: 90, source: "both", horizonDate: null }
+    this.state = { currency: "USD", period: 90, from: null, to: null, source: "both", horizonDate: null }
     this.runIndex = null
     this.pinned = {} // exact table-picked snapshots by provider
     this.selectedRunId = null
@@ -54,12 +55,24 @@ export default class extends Controller {
     this.payload = null
     this.onTheme = () => this.render()
     window.addEventListener("theme:change", this.onTheme)
+    // The custom-range popup closes on an outside click or Escape; the period
+    // stays "custom" — clicking «Свой» again reopens it.
+    this.onDocPointer = (e) => {
+      if (this.rangeTarget.hidden || this.rangeTarget.contains(e.target)) return
+      if (e.target.closest?.('[data-key="period"][data-value="custom"]')) return
+      this.rangeTarget.hidden = true
+    }
+    this.onDocKey = (e) => { if (e.key === "Escape") this.rangeTarget.hidden = true }
+    document.addEventListener("pointerdown", this.onDocPointer)
+    document.addEventListener("keydown", this.onDocKey)
     this.render()
     this.load()
   }
 
   disconnect() {
     window.removeEventListener("theme:change", this.onTheme)
+    document.removeEventListener("pointerdown", this.onDocPointer)
+    document.removeEventListener("keydown", this.onDocKey)
     this.stopPlay()
     this.abort?.abort()
     this.accuracyAbort?.abort()
@@ -70,6 +83,7 @@ export default class extends Controller {
 
   setOption(event) {
     const { key, value } = event.currentTarget.dataset
+    const previousPeriod = this.state.period
     const num = Number(value)
     this.state[key] = Number.isNaN(num) ? value : num
     this.resetPlayback()
@@ -77,7 +91,34 @@ export default class extends Controller {
     if (key === "source") return this.render()
     // Currency and period both change what the server should send; the
     // accuracy block only depends on the period (it holds every currency).
-    if (key === "period") this.loadAccuracy()
+    if (key === "period") {
+      this.rangeTarget.hidden = this.state.period !== "custom"
+      if (this.state.period === "custom") {
+        // First open starts from the period that was on screen instead of
+        // empty fields — the user adjusts dates, not types them from scratch.
+        if (!this.state.from) this.prefillRange(previousPeriod)
+        // preventScroll: focusing the field must not scroll the page around.
+        this.fromDateTarget.focus({ preventScroll: true })
+      }
+      this.loadAccuracy()
+    }
+    this.load()
+  }
+
+  prefillRange(previousPeriod) {
+    const days = typeof previousPeriod === "number" ? previousPeriod : 90
+    this.state.from = this.fromDateTarget.value = isoDaysAgo(days)
+    this.state.to = this.toDateTarget.value = isoDaysAgo(0)
+  }
+
+  // Custom period: two date fields; refetch as soon as a start date exists.
+  setRange() {
+    this.state.from = this.fromDateTarget.value || null
+    this.state.to = this.toDateTarget.value || null
+    if (!this.state.from) return
+    this.resetPlayback()
+    this.page = 1
+    this.loadAccuracy()
     this.load()
   }
 
@@ -133,8 +174,7 @@ export default class extends Controller {
     this.abort?.abort()
     this.abort = new AbortController()
     const { currency } = this.state
-    const from = this.periodFrom()
-    const range = from ? `&from=${from}` : ""
+    const range = this.rangeQuery()
     try {
       const [facts, forecasts] = await Promise.all([
         this.fetchJson(`/series?currency=${currency}&providers=cbr${range}`),
@@ -154,9 +194,9 @@ export default class extends Controller {
   async loadAccuracy() {
     this.accuracyAbort?.abort()
     this.accuracyAbort = new AbortController()
-    const from = this.periodFrom()
+    const range = this.rangeQuery()
     try {
-      const response = await fetch(`/forecasts/accuracy${from ? `?from=${from}` : ""}`,
+      const response = await fetch(`/forecasts/accuracy${range ? `?${range.slice(1)}` : ""}`,
         { signal: this.accuracyAbort.signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       this.accuracyBoxTarget.innerHTML = await response.text()
@@ -167,9 +207,17 @@ export default class extends Controller {
     }
   }
 
-  // ISO date the selected period starts on; null means no bound at all.
-  periodFrom() {
-    return this.state.period === "all" ? null : isoDaysAgo(this.state.period)
+  // {from, to} of the selected period; "all" means no bounds at all.
+  range() {
+    if (this.state.period === "all") return {}
+    if (this.state.period === "custom") return { from: this.state.from, to: this.state.to }
+    return { from: isoDaysAgo(this.state.period) }
+  }
+
+  // "&from=…&to=…" ready to append to a query string; "" without bounds.
+  rangeQuery() {
+    const { from, to } = this.range()
+    return (from ? `&from=${from}` : "") + (to ? `&to=${to}` : "")
   }
 
   async fetchJson(url) {

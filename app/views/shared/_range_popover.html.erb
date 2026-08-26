@@ -1,0 +1,10 @@
+<%# Custom period: a small popup with two date fields, anchored to the period
+    segment (wrap both in .popover-anchor). scope: the Stimulus controller name %>
+<div class="popover range" data-<%= scope %>-target="range" hidden>
+  <label class="control__label" for="<%= scope %>-range-from">С</label>
+  <input id="<%= scope %>-range-from" type="date" class="input input--date"
+         data-<%= scope %>-target="fromDate" data-action="change-><%= scope %>#setRange">
+  <label class="control__label" for="<%= scope %>-range-to">по</label>
+  <input id="<%= scope %>-range-to" type="date" class="input input--date"
+         data-<%= scope %>-target="toDate" data-action="change-><%= scope %>#setRange">
+</div>

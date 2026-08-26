@@ -9,13 +9,14 @@
 class ForecastSeries
   MAX_RUNS = 100
 
-  # Optional from keeps only snapshots captured on that date or later — the
-  # page's period switch filters every block by capture date.
-  def initialize(currency:, providers: ForecastRun::PROVIDERS, latest_only: false, from: nil)
+  # Optional from/to keep only snapshots captured inside those dates — the
+  # page's period switch and custom range filter every block by capture date.
+  def initialize(currency:, providers: ForecastRun::PROVIDERS, latest_only: false, from: nil, to: nil)
     @currency = currency
     @providers = providers
     @latest_only = latest_only
     @from = from
+    @to = to
   end
 
   # { currency:, series: { "apecon" => { runs: [...], index: [ { id:,
@@ -45,6 +46,7 @@ class ForecastSeries
   def provider_series(provider)
     scope = ForecastRun.for(@currency, provider).chronological
     scope = scope.where(captured_at: @from.in_time_zone..) if @from
+    scope = scope.where(captured_at: ..@to.in_time_zone.end_of_day) if @to
     runs = scope.to_a
     return { runs: full_runs(runs.last(1)) } if @latest_only
 

@@ -63,6 +63,18 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, response.parsed_body.dig("series", "apecon", "index").size
   end
 
+  test "to param keeps only snapshots captured on that date or earlier" do
+    store("apecon", "USD", Time.utc(2026, 5, 1), "78")
+    store("apecon", "USD", Time.utc(2026, 8, 22), "81")
+
+    get forecasts_data_path(currency: "USD", from: "2026-04-01", to: "2026-06-30")
+
+    runs = response.parsed_body.dig("series", "apecon", "runs")
+    assert_equal 1, runs.size
+    assert_equal [ [ "2026-09-01", 78.0, nil, nil ] ], runs[0]["points"]
+    assert_equal 1, response.parsed_body.dig("series", "apecon", "index").size
+  end
+
   test "GET /forecasts/accuracy returns the groups for the requested period" do
     get forecasts_accuracy_path(from: "2026-07-01")
 

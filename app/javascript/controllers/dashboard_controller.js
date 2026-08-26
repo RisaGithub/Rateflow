@@ -32,12 +32,24 @@ export default class extends Controller {
     this.forecastPayload = null
     this.onTheme = () => this.render()
     window.addEventListener("theme:change", this.onTheme)
+    // The custom-range popup closes on an outside click or Escape; the period
+    // stays "custom" — clicking «Свой» again reopens it.
+    this.onDocPointer = (e) => {
+      if (this.rangeTarget.hidden || this.rangeTarget.contains(e.target)) return
+      if (e.target.closest?.('[data-key="period"][data-value="custom"]')) return
+      this.rangeTarget.hidden = true
+    }
+    this.onDocKey = (e) => { if (e.key === "Escape") this.rangeTarget.hidden = true }
+    document.addEventListener("pointerdown", this.onDocPointer)
+    document.addEventListener("keydown", this.onDocKey)
     this.render()
     this.loadForecasts()
   }
 
   disconnect() {
     window.removeEventListener("theme:change", this.onTheme)
+    document.removeEventListener("pointerdown", this.onDocPointer)
+    document.removeEventListener("keydown", this.onDocKey)
     this.abortController?.abort()
     this.forecastAbort?.abort()
     this.chart?.destroy()
@@ -53,16 +65,28 @@ export default class extends Controller {
 
   setOption(event) {
     const { key, value } = event.currentTarget.dataset
+    const previousPeriod = this.state.period
     const num = Number(value)
     this.state[key] = Number.isNaN(num) ? value : num
 
     if (key === "rows" || key === "tableSource") return this.render()
     if (key === "period") {
       this.rangeTarget.hidden = this.state.period !== "custom"
-      // A custom range only makes sense once at least the start date is set.
-      if (this.state.period === "custom" && !this.state.from) return this.render()
+      if (this.state.period === "custom") {
+        // First open starts from the period that was on screen instead of
+        // empty fields — the user adjusts dates, not types them from scratch.
+        if (!this.state.from) this.prefillRange(previousPeriod)
+        // preventScroll: focusing the field must not scroll the page around.
+        this.fromDateTarget.focus({ preventScroll: true })
+      }
     }
     this.load()
+  }
+
+  prefillRange(previousPeriod) {
+    const days = typeof previousPeriod === "number" ? previousPeriod : 30
+    this.state.from = this.fromDateTarget.value = isoDaysAgo(days)
+    this.state.to = this.toDateTarget.value = isoDaysAgo(0)
   }
 
   // Custom period: two date fields; refetch as soon as a start date exists.

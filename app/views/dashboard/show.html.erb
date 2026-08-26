@@ -22,13 +22,10 @@
       <h2 class="section__title">График</h2>
       <div class="section__aside controls">
         <%= render "shared/segment", scope: "dashboard", key: "currency", label: "Валюта", options: Rate::CURRENCIES.map { |c| [c, c] } %>
-        <%= render "shared/segment", scope: "dashboard", key: "period", label: "Период",
-                   options: [[7, "7 дн"], [30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>
-        <div class="control range" data-dashboard-target="range" hidden>
-          <label class="control__label" for="range-from">С</label>
-          <input id="range-from" type="date" class="input input--date" data-dashboard-target="fromDate" data-action="change->dashboard#setRange">
-          <label class="control__label" for="range-to">по</label>
-          <input id="range-to" type="date" class="input input--date" data-dashboard-target="toDate" data-action="change->dashboard#setRange">
+        <div class="popover-anchor">
+          <%= render "shared/segment", scope: "dashboard", key: "period", label: "Период",
+                     options: [[7, "7 дн"], [30, "30 дн"], [90, "90 дн"], [365, "1 год"], [1825, "5 лет"], ["all", "Всё"], ["custom", "Свой"]] %>
+          <%= render "shared/range_popover", scope: "dashboard" %>
         </div>
         <div class="control">
           <span class="control__label">Источники</span>

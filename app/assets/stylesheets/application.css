@@ -289,8 +289,35 @@ svg.icon { flex: none; }
 .chip--currencyapi:has(input:checked) .chip__dot { background: var(--text-2); opacity: 1; }
 .chip--apecon:has(input:checked) .chip__dot { background: var(--accent-2); opacity: 1; }
 
-/* Custom date range: one compact non-wrapping group. */
-.range { flex-wrap: nowrap; }
+/* Custom date range: a small popup floating over the content, anchored to
+   the right edge of the period segment — right under the "Свой" button. */
+.popover-anchor { position: relative; }
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  transform-origin: top right;
+}
+.popover[hidden] { display: none; }
+
+/* Opens with a short drop-in from the «Свой» button it hangs under. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes popover-in {
+    from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+  }
+  .popover:not([hidden]) { animation: popover-in 180ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+}
 .input.input--date { width: 148px; height: 30px; padding: 0 8px; font-size: 12px; flex: none; }
 
 /* ---------- Chart ---------- */
@@ -620,4 +647,7 @@ button.pager__link { border: 0; background: none; cursor: pointer; }
   .nav__link { padding: 6px 8px; }
   .page-title { font-size: 18px; }
   .seg { flex-wrap: wrap; }
+  /* Narrow screens: the anchor sits near the left edge, so the popup grows rightwards. */
+  .popover { right: auto; left: 0; transform-origin: top left; }
+  .input.input--date { width: 128px; }
 }

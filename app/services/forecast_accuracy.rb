@@ -13,11 +13,13 @@ class ForecastAccuracy
 
   # Optional currency narrows the scoring to one currency — the forecasts page
   # shows a report per currency so its shared currency switch applies here too.
-  # Optional from keeps only points whose horizon date falls on it or later,
-  # matching the page's period switch.
-  def initialize(currency: nil, from: nil)
+  # Optional from/to keep only points whose horizon date falls inside them,
+  # matching the page's period switch and custom range. Scoring never reaches
+  # past today regardless of to — the future has no fact yet.
+  def initialize(currency: nil, from: nil, to: nil)
     @currency = currency
     @from = from
+    @to = to
   end
 
   def reports
@@ -36,7 +38,7 @@ class ForecastAccuracy
   def errors_for(provider)
     points = ForecastPoint.joins(:forecast_run)
                           .where(forecast_runs: { provider: provider, currency: @currency || Rate::CURRENCIES })
-                          .where(horizon_date: @from..Date.current)
+                          .where(horizon_date: @from..[ @to, Date.current ].compact.min)
                           .pluck(:horizon_date, :value, "forecast_runs.currency", "forecast_runs.captured_at")
     return [] if points.empty?
 
