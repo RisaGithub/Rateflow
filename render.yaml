@@ -23,6 +23,10 @@ services:
         sync: false
       - key: RAILS_ENV
         value: production
+      # Keeps the Active Record pool equal to Puma's thread count so the app
+      # never wants more connections than Supabase's free tier comfortably gives.
+      - key: RAILS_MAX_THREADS
+        value: "3"
       - key: RAILS_SERVE_STATIC_FILES
         value: "true"
       - key: TZ

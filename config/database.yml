@@ -2,6 +2,12 @@ default: &default
   adapter: postgresql
   encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # Supabase's free tier allows few connections and a hung query must not
+  # hold a Puma thread: fail fast on connect/checkout, cap every statement.
+  connect_timeout: 5
+  checkout_timeout: 5
+  variables:
+    statement_timeout: 15s
 
 development:
   <<: *default
