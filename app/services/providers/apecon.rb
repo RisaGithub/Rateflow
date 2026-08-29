@@ -31,6 +31,12 @@ module Providers
 
     CRAWL_LOCK = Mutex.new
 
+    # apecon.ru sits behind an sgcaptcha bot check that challenges by IP: a
+    # datacenter address gets a meta-refresh stub instead of the page, with a
+    # 200 status. That is the site saying it does not want automated requests
+    # from servers, so we report it plainly and do not try to get around it.
+    CHALLENGE_RE = /sgcaptcha|\/\.well-known\/captcha/i
+
     class << self
       # Sleeps out the remainder of the crawl delay since the previous request.
       def respect_crawl_delay
@@ -88,6 +94,12 @@ module Providers
       (@pages ||= {})[currency] ||= begin
         url = PAGES.fetch(currency) { raise Error, "Unknown currency #{currency}" }
         body, status = get(url)
+        if body.to_s.match?(CHALLENGE_RE)
+          raise Error.new("apecon.ru answered with a bot check (sgcaptcha) instead of the page — " \
+                          "this host's IP is being challenged, so the page cannot be read from here",
+                          http_status: status)
+        end
+
         doc = parse_html(body)
         { quote: attempt_parse { parse_quote(doc, currency) },
           forecast: attempt_parse { parse_forecast(doc) },

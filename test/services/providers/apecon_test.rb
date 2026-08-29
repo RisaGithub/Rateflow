@@ -84,6 +84,20 @@ module Providers
       assert_raises(Providers::Error) { Broken.new.fetch(%w[USD]) }
     end
 
+    # A datacenter IP gets a meta-refresh stub with status 200 instead of the
+    # page. That is a blocked request, not broken markup, and the error has to
+    # say so — otherwise the fetch log blames a redesign that never happened.
+    test "a bot check is reported as a bot check, not as unrecognized markup" do
+      challenge = Shaped.new(
+        '<html><head><meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F"></head></html>'
+      )
+
+      error = assert_raises(Providers::Error) { challenge.fetch_forecast("USD") }
+
+      assert_match(/bot check/, error.message)
+      assert_no_match(/not recognized/, error.message)
+    end
+
     test "unknown currency raises Providers::Error" do
       assert_raises(Providers::Error) { Stubbed.new.fetch_forecast("JPY") }
     end
