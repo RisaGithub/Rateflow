@@ -126,6 +126,9 @@ module Providers
 
       assert_match(/0 tables/, error.message)
       assert_match(/0 month rows/, error.message)
+      # A page with no tables is quoted, so a stub served to our IP is readable
+      # straight from the fetch log.
+      assert_match(/Совсем другая разметка/, error.message)
     end
   end
 end

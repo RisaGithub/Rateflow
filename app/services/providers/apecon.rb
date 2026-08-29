@@ -115,7 +115,17 @@ module Providers
     def page_shape(doc, body)
       rows = doc.css("table tr")
       months = rows.count { |tr| cells_of(tr).first.to_s.match?(MONTH_RE) }
-      "#{body.to_s.bytesize} B, #{doc.css('table').size} tables, #{rows.size} rows, #{months} month rows"
+      shape = "#{body.to_s.bytesize} B, #{doc.css('table').size} tables, " \
+              "#{rows.size} rows, #{months} month rows"
+      # No tables at all means we were handed something other than the page —
+      # a redirect stub, a block notice. Quote it, or the next reader is left
+      # guessing again.
+      shape += ", body: #{snippet(body)}" if doc.css("table").empty?
+      shape
+    end
+
+    def snippet(body)
+      body.to_s.dup.force_encoding("utf-8").scrub.gsub(/[[:space:]]+/, " ").strip.truncate(200).inspect
     end
 
     # Base#get plus the mandatory pause between any two requests to the site.
