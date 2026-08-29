@@ -10,6 +10,11 @@
 # CBR. The apecon quote is stored by ForecastsFetcher instead, riding on the
 # same page load as the forecast.
 class RatesFetcher
+  # How many rows the providers handed over in the last run, against the
+  # written count #call returns. On a quiet run received is the usual ~170 and
+  # written is 0 — Rate.store skips everything that has not moved.
+  attr_reader :received
+
   def initialize(days: 14, currencies: Rate::CURRENCIES, providers: nil)
     @from = days.days.ago.to_date
     @to = Date.current
@@ -17,10 +22,14 @@ class RatesFetcher
     @providers = providers || [ Providers::Cbr.new, Providers::Erapi.new, Providers::Currencyapi.new ]
   end
 
-  # Returns total number of rows written.
+  # Returns total number of rows written — which is 0 when every provider
+  # merely resent numbers already stored.
   def call
+    @received = 0
     written = @providers.sum do |provider|
-      Rate.store(attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }, provider.key)
+      records = attempt(provider) { provider.fetch(@currencies, from: @from, to: @to) }
+      @received += records.size
+      Rate.store(records, provider.key)
     end
     refresh_internal_forecast if written.positive?
     written
@@ -45,9 +54,10 @@ class RatesFetcher
     []
   end
 
-  # Every data update re-snapshots our own forecast (deduped inside), so the
-  # internal forecast history tracks the data it was built from. Its failure
-  # must not sink the fetch itself.
+  # A run that actually wrote something re-snapshots our own forecast (deduped
+  # inside), so the internal forecast history tracks the data it was built
+  # from. A run that changed nothing skips it entirely. Its failure must not
+  # sink the fetch itself.
   def refresh_internal_forecast
     InternalForecast.new(currencies: @currencies).call
   rescue StandardError => e

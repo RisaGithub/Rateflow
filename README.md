@@ -22,13 +22,13 @@ apecon.ru (HTML) ─────────────▶  ForecastsFetcher �
 every fetch attempt ──────────▶  (logged inline) ─────────────▶ fetch_logs ─────▶ /sources, /admin
 ```
 
-An external scheduler GETs `/cron/refresh` and `/cron/forecasts`; the controllers call the same service objects the admin buttons and rake tasks use, everything runs inside the request (no queues), results are upserted, and every attempt lands in `fetch_logs`. Pages read through thin read models (`Dashboard`, `RateSeries`, `ForecastSeries`, `ForecastAccuracy`) that keep the heavy lifting in SQL; charts fetch JSON (`/series`, `/forecasts/data`) that is cached for 10 minutes and invalidated by the tables' `max(updated_at)`.
+An external scheduler GETs `/cron/refresh` and `/cron/forecasts`; the controllers call the same service objects the admin buttons and rake tasks use, everything runs inside the request (no queues), results are upserted, and every attempt lands in `fetch_logs`. Pages themselves query nothing: `/` and `/forecasts` render a shell of skeletons and fill it from JSON (`/dashboard/data`, `/series`, `/forecasts/data`) and one HTML fragment (`/forecasts/accuracy`). Those go through thin read models (`Dashboard`, `RateSeries`, `ForecastSeries`, `ForecastAccuracy`) that keep the heavy lifting in SQL, and are cached for 10 minutes, invalidated by the tables' `max(updated_at)`.
 
 ## Data schema
 
 Four tables, no users, no queues:
 
-- **rates** — one row per (currency, provider, date): the fact. Unique index on the triple; upserts keep re-fetches idempotent.
+- **rates** — one row per (currency, provider, date): the fact. Unique index on the triple; upserts keep re-fetches idempotent, and a row is only written when its value actually changed, so a fetch that brings nothing new leaves `updated_at` — and the caches keyed on it — alone.
 - **forecast_runs** — one stored forecast snapshot: provider (`apecon` / `internal`), currency, `captured_at`. A snapshot identical to the previous one only bumps `captured_at`.
 - **forecast_points** — the payload of a run: horizon date, predicted value, optional min–max corridor. `belongs_to :forecast_run`, unique per (run, horizon date).
 - **fetch_logs** — journal of every call to every source: provider, kind (`rates` / `forecast`), ok flag, HTTP status, duration, error, rows written. Feeds `/sources`, `/admin` and the cron throttle; pruned after 90 days.
@@ -101,8 +101,16 @@ GET /cron/refresh?token=...     # rates: the three API providers, last 14 days (
 GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stalest, quote saved too) + internal for all
 ```
 
+`/cron/refresh` is meant to be **attempted every two hours** — often enough that a new CBR rate shows up within the hours it is published, cheap enough to be free. Trying often only works because a try that finds nothing new costs nothing: the providers resend two weeks of history every time, and only rows whose value actually changed are written. On a quiet run nothing is touched, `updated_at` does not move, the JSON caches keyed on it survive, and the internal forecast is not recomputed. The response spells both numbers out:
+
+```json
+{"status":"ok","kind":"rates","rows_written":0,"rows_received":168,"duration_ms":842}
+```
+
+`records_count` in the fetch log stays the number of rows the provider handed over — that is a measure of the provider being up, and `/sources` reads it as such.
+
 - Token from `ENV["CRON_TOKEN"]`, compared with `secure_compare`. No token configured → 503; wrong token → 401.
-- The same update having run less than 10 minutes ago → `{"status":"skipped"}` with no network calls.
+- The same update having run less than 10 minutes ago → `{"status":"skipped"}` with no network calls. That is a guard against a double call, not a schedule: it does not get in the way of a two-hourly one.
 - Both endpoints (and `/admin`) are rate-limited to 20 requests per minute per IP; past that the answer is 429.
 - The day's first successful `/cron/refresh` also prunes housekeeping data (see `logs:prune` below), so no separate cleanup scheduler is needed.
 - `/cron/forecasts` touches **one** currency per call (АПЭКОН's 10 s crawl delay makes four too slow for one request). Schedule it ~4 times a day and every currency rotates through within a day.
@@ -110,7 +118,7 @@ GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stal
 Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 ```
-0 6,12,18 * * *   curl -fsS "https://your-app/cron/refresh?token=$CRON_TOKEN"
+0 */2 * * *          curl -fsS "https://your-app/cron/refresh?token=$CRON_TOKEN"
 30 6,10,14,18 * * *  curl -fsS "https://your-app/cron/forecasts?token=$CRON_TOKEN"
 ```
 
@@ -165,7 +173,7 @@ Supabase offers three connection strings; only one of them is right here:
    `RAILS_ENV`, `RAILS_SERVE_STATIC_FILES`, `RAILS_MAX_THREADS` and `TZ` come preset from the blueprint. Deploy; the first build also migrates the empty Supabase database.
 3. **First data** (the tables are empty): either press the `/admin` buttons in order («Обновить курсы», «Догрузить год ЦБ РФ», «Обновить прогнозы», «Пересчитать прогноз Rateflow») for a live last year, or — better — run the full seed from a laptop as described in the next section. The long tasks (full archive and forecast backtest) are too slow for a web request, and the free Render tier has no shell, so the laptop route (see [Seeding the production database from a laptop](#seeding-the-production-database-from-a-laptop)) is the only way to get the complete 1999-onwards archive.
 4. **Scheduler** (e.g. cron-job.org): two GET jobs with the token from step 2 —
-   - `https://rateflow-forecast.onrender.com/cron/refresh?token=…` every 6 hours;
+   - `https://rateflow-forecast.onrender.com/cron/refresh?token=…` every 2 hours;
    - `https://rateflow-forecast.onrender.com/cron/forecasts?token=…` 4 times a day (each call refreshes one АПЭКОН currency, so all four rotate through daily).
 5. **Custom domain later**: add it in Render, then set `APP_HOST` to that domain so Rails' host allowlist accepts it.
 

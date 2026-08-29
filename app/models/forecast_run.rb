@@ -39,13 +39,18 @@ class ForecastRun < ApplicationRecord
     end
   end
 
+  # Dedup hinges on this: values are compared at the precision the column
+  # actually stores, so a forecast recomputed from unchanged data reads as the
+  # same snapshot instead of piling up a new version on every run.
   def same_points?(new_points)
     stored = points.order(:horizon_date).pluck(:horizon_date, :value, :low, :high)
     fresh = new_points.map { |p| [ p[:horizon_date], big(p[:value]), big(p[:low]), big(p[:high]) ] }.sort_by(&:first)
     stored == fresh
   end
 
+  def self.value_scale = @value_scale ||= ForecastPoint.columns_hash["value"].scale
+
   private
 
-  def big(value) = value.nil? ? nil : BigDecimal(value.to_s)
+  def big(value) = value.nil? ? nil : BigDecimal(value.to_s).round(self.class.value_scale)
 end

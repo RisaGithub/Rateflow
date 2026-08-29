@@ -1,19 +1,6 @@
 require "net/http"
 
 module Providers
-  # Raised for any failure talking to a provider (network, HTTP, parsing).
-  class Error < StandardError
-    attr_reader :http_status
-
-    def initialize(message, http_status: nil)
-      super(message)
-      @http_status = http_status
-    end
-  end
-
-  # Result of one provider call: parsed rate rows + the HTTP status we got.
-  Result = Struct.new(:records, :http_status, keyword_init: true)
-
   class Base
     TIMEOUT = 10
     USER_AGENT = "Rateflow/1.0 (+https://github.com/RisaGithub/Rateflow)".freeze

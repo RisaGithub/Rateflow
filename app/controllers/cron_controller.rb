@@ -20,9 +20,13 @@ class CronController < ApplicationController
     return render_skipped("rates") if recently_ran?("rates")
 
     started = now_ms
-    written = RatesFetcher.new.call
+    fetcher = RatesFetcher.new
+    written = fetcher.call
     prune_logs_daily
-    render json: { status: "ok", kind: "rates", rows_written: written, duration_ms: now_ms - started }
+    # rows_received against rows_written: how much the providers sent, and how
+    # much of it was actually new. A quiet run writes 0 out of ~170.
+    render json: { status: "ok", kind: "rates", rows_written: written,
+                   rows_received: fetcher.received, duration_ms: now_ms - started }
   end
 
   # GET /cron/forecasts?token=… — one АПЭКОН currency per call (the stalest;

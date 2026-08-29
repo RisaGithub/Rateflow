@@ -6,7 +6,7 @@ class CronControllerTest < ActionDispatch::IntegrationTest
     def call = raise("network must not be touched")
   end
 
-  SilentFetcher = Struct.new(:result) do
+  SilentFetcher = Struct.new(:result, :received) do
     def call = result
   end
 
@@ -42,14 +42,17 @@ class CronControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "valid token refreshes rates and reports JSON" do
-    stubbing_new(RatesFetcher, SilentFetcher.new(7)) do
+    stubbing_new(RatesFetcher, SilentFetcher.new(7, 170)) do
       get cron_refresh_path(token: "s3cret")
     end
 
     assert_response :success
     body = response.parsed_body
     assert_equal "ok", body["status"]
+    # Both numbers, so a run that wrote nothing out of a full provider payload
+    # is readable at a glance.
     assert_equal 7, body["rows_written"]
+    assert_equal 170, body["rows_received"]
     assert body.key?("duration_ms")
   end
 

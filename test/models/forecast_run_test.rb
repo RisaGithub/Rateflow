@@ -36,6 +36,18 @@ class ForecastRunTest < ActiveSupport::TestCase
     assert_equal 3, ForecastRun.count
   end
 
+  # forecast_points keeps four decimals. Comparing at a finer precision would
+  # store a "new" version on every run — and with the fetch now attempted six
+  # times as often, that is a snapshot table growing for no reason.
+  test "extra decimals beyond the column's scale do not make a new version" do
+    ForecastRun.store(provider: "internal", currency: "USD",
+                      points: [ { horizon_date: Date.new(2026, 9, 1), value: BigDecimal("80.5") } ])
+    ForecastRun.store(provider: "internal", currency: "USD",
+                      points: [ { horizon_date: Date.new(2026, 9, 1), value: BigDecimal("80.500004") } ])
+
+    assert_equal 1, ForecastRun.count
+  end
+
   test "empty snapshot is rejected" do
     assert_raises(ArgumentError) { ForecastRun.store(provider: "apecon", currency: "USD", points: []) }
   end
