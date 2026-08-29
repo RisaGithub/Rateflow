@@ -1,0 +1,7 @@
+<%# Placeholder table rows: the real row height (same padding, same font), so
+    the table keeps its box while the data is on the way. %>
+<% rows.times do %>
+  <tr class="skel-row" aria-hidden="true">
+    <% cols.times do %><td><span class="skel skel-line">&nbsp;</span></td><% end %>
+  </tr>
+<% end %>

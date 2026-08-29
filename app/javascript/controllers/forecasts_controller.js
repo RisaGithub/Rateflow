@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { crossfade, dropSkeleton, fadeIn } from "lib/skeletons"
 
 const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Прогноз Rateflow" }
 const SOURCE_NAMES = { apecon: "АПЭКОН", internal: "Rateflow" }
@@ -20,6 +21,8 @@ const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyV
 const dotRadius = (labelCount) =>
   labelCount > 400 ? 1 : labelCount > 150 ? 1.5 : labelCount > 60 ? 2 : 2.5
 const alphaHex = (a) => Math.round(a * 255).toString(16).padStart(2, "0")
+const retryButton = (action) =>
+  `<button type="button" class="retry-btn" data-action="forecasts#${action}">Повторить</button>`
 // Evenly sampled max items; the first and the newest always survive.
 const thinEven = (items, max) => {
   if (items.length <= max) return items
@@ -35,16 +38,14 @@ const thinEven = (items, max) => {
 // The period bounds the fact line and the snapshot capture dates — the
 // forecast part of the main chart always shows in full.
 export default class extends Controller {
-  static targets = ["seg", "range", "fromDate", "toDate",
-                    "mainCanvas", "playback", "playBtn", "playSlider", "playLabel",
-                    "mainLegend", "mainStatus", "fanCanvas", "fanStatus",
-                    "horizonSelect", "revisionCanvas", "revisionLegend", "revisionStatus",
+  static targets = ["seg", "range", "fromDate", "toDate", "emptyNotice",
+                    "mainCanvas", "mainWrap", "playback", "playBtn", "playSlider", "playLabel",
+                    "mainLegend", "mainStatus", "fanCanvas", "fanWrap", "fanStatus",
+                    "horizonSelect", "revisionCanvas", "revisionWrap", "revisionLegend", "revisionStatus",
                     "accuracyBox", "accuracyGroup", "accuracyCard",
                     "snapshotsBody", "pagerPrev", "pagerNext", "pagerInfo"]
 
   connect() {
-    // period 90 mirrors ForecastsController::DEFAULT_PERIOD_DAYS — the
-    // server pre-renders the accuracy block for the same window.
     this.state = { currency: "USD", period: 90, from: null, to: null, source: "both", horizonDate: null }
     this.runIndex = null
     this.pinned = {} // exact table-picked snapshots by provider
@@ -65,8 +66,10 @@ export default class extends Controller {
     this.onDocKey = (e) => { if (e.key === "Escape") this.rangeTarget.hidden = true }
     document.addEventListener("pointerdown", this.onDocPointer)
     document.addEventListener("keydown", this.onDocKey)
-    this.render()
+    // Controls are drawable without any data; every block below waits for it.
+    this.renderControls()
     this.load()
+    this.loadAccuracy()
   }
 
   disconnect() {
@@ -182,11 +185,25 @@ export default class extends Controller {
       ])
       this.facts = facts.series?.cbr?.points || []
       this.payload = forecasts
+      this.emptyNoticeTarget.hidden = !forecasts.empty
       this.render()
     } catch (error) {
       if (error.name === "AbortError") return
-      this.mainStatusTarget.innerHTML = `<span>Не удалось загрузить данные — попробуйте обновить страницу</span>`
+      this.dropChartSkeletons()
+      this.mainStatusTarget.innerHTML =
+        `<span>Не удалось загрузить данные${this.payload ? " — показаны последние загруженные" : ""}</span>` +
+        retryButton("retryData")
     }
+  }
+
+  // «Повторить» next to a failure message repeats exactly that request.
+  retryData() { this.load() }
+  retryAccuracy() { this.loadAccuracy() }
+
+  // A failed load must not leave placeholders sweeping behind the message.
+  dropChartSkeletons() {
+    [ this.mainWrapTarget, this.fanWrapTarget, this.revisionWrapTarget ].forEach(dropSkeleton)
+    this.snapshotsBodyTarget.innerHTML = ""
   }
 
   // The accuracy section is server-rendered HTML: refetched per period,
@@ -200,10 +217,12 @@ export default class extends Controller {
         { signal: this.accuracyAbort.signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       this.accuracyBoxTarget.innerHTML = await response.text()
+      fadeIn(this.accuracyBoxTarget)
       this.renderAccuracy()
     } catch (error) {
       if (error.name === "AbortError") return
-      this.accuracyBoxTarget.innerHTML = `<p class="panel__note">Не удалось загрузить точность — попробуйте обновить страницу</p>`
+      this.accuracyBoxTarget.innerHTML =
+        `<div class="load-error"><span>Не удалось загрузить точность</span>${retryButton("retryAccuracy")}</div>`
     }
   }
 
@@ -321,20 +340,29 @@ export default class extends Controller {
   // ----- render -----
 
   render() {
-    this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
+    this.renderControls()
+    this.renderAccuracy()
+    if (!this.payload) return // still loading: the skeletons keep the boxes
+
     this.renderMain()
     this.renderPlayback()
     this.renderMainLegend()
     this.renderMainStatus()
     this.renderFan()
     this.renderRevision()
-    this.renderAccuracy()
     this.renderSnapshots()
+  }
+
+  // Everything that needs no data at all — drawn on connect so the switches
+  // answer clicks while the first requests are still in flight.
+  renderControls() {
+    this.segTargets.forEach((b) => b.setAttribute("aria-pressed", String(String(this.state[b.dataset.key]) === b.dataset.value)))
   }
 
   // Block 5: the complete snapshot log from the metadata index — every stored
   // version, not just the thinned hundred the charts draw.
   renderSnapshots() {
+    fadeIn(this.snapshotsBodyTarget)
     const rows = this.sources().flatMap((p) => this.index(p).map((r) => ({ ...r, provider: p })))
     rows.sort((a, b) => (a.captured_at < b.captured_at ? 1 : -1))
 
@@ -366,8 +394,6 @@ export default class extends Controller {
   // Block 1: the fact as a muted solid line, active snapshots dashed on top,
   // АПЭКОН's min–max range as a shaded corridor.
   renderMain(mode) {
-    if (typeof Chart === "undefined") return
-
     const factColor = cssVar("--text-3")
     const lines = this.sources().flatMap((p) => {
       const run = this.activeRun(p)
@@ -421,7 +447,7 @@ export default class extends Controller {
       }
     }
 
-    this.upsert("main", this.mainCanvasTarget, { labels, datasets }, this.baseOptions(labels), mode)
+    this.upsert("main", this.mainCanvasTarget, this.mainWrapTarget, { labels, datasets }, this.baseOptions(labels), mode)
   }
 
   // Block 2: every snapshot captured in the period at once, translucent —
@@ -429,8 +455,6 @@ export default class extends Controller {
   // and how stable it is. Static by design: no animation, no hover, thinned
   // to FAN_MAX per provider; the true per-period totals come from the index.
   renderFan() {
-    if (typeof Chart === "undefined") return
-
     const fans = this.sources().map((p) => ({
       provider: p,
       total: this.index(p).length || this.runs(p).length,
@@ -465,8 +489,9 @@ export default class extends Controller {
     options.animation = { duration: 0 }
     options.events = [] // dozens of lines: hover picking would cost more than it tells
     options.plugins.tooltip.enabled = false
-    this.upsert("fan", this.fanCanvasTarget, { labels, datasets }, options, "none")
+    this.upsert("fan", this.fanCanvasTarget, this.fanWrapTarget, { labels, datasets }, options, "none")
 
+    fadeIn(this.fanStatusTarget)
     if (fans.every((f) => !f.shown.length)) {
       this.fanStatusTarget.innerHTML = `<span>${this.emptyNote()}</span>`
       return
@@ -481,12 +506,13 @@ export default class extends Controller {
   // snapshot. When the date has already come, the CBR fact runs as a flat
   // line — did the revisions converge on the truth or walk away from it?
   renderRevision() {
-    if (typeof Chart === "undefined") return
-
+    fadeIn(this.revisionLegendTarget)
+    fadeIn(this.revisionStatusTarget)
     const dates = this.horizonDates()
     this.syncHorizonSelect(dates)
     const date = this.state.horizonDate
     if (!date) {
+      crossfade(this.revisionWrapTarget)
       this.charts.revision?.destroy()
       delete this.charts.revision
       this.revisionLegendTarget.innerHTML = ""
@@ -535,7 +561,7 @@ export default class extends Controller {
 
     const options = this.baseOptions(labels)
     options.plugins.tooltip.callbacks.title = (items) => `снимок от ${dateRu(items[0].label)}`
-    this.upsert("revision", this.revisionCanvasTarget, { labels, datasets }, options)
+    this.upsert("revision", this.revisionCanvasTarget, this.revisionWrapTarget, { labels, datasets }, options)
 
     const items = revisions.map((r) => {
       const cls = r.provider === "apecon" ? "legend__swatch--apecon" : ""
@@ -585,6 +611,7 @@ export default class extends Controller {
   }
 
   renderMainLegend() {
+    fadeIn(this.mainLegendTarget)
     const items = [`<span class="legend__item"><span class="legend__swatch legend__swatch--alt"></span>ЦБ РФ (факт)</span>`]
     this.sources().forEach((p) => {
       const run = this.activeRun(p)
@@ -606,6 +633,7 @@ export default class extends Controller {
 
   // Which snapshots are on screen right now.
   renderMainStatus() {
+    fadeIn(this.mainStatusTarget)
     const parts = this.sources().flatMap((provider) => {
       const run = this.activeRun(provider)
       if (!run) return [`${FORECAST_NAMES[provider]}: снимков ${this.state.period === "all" ? `для ${this.state.currency} пока нет` : "в выбранном периоде нет"}`]
@@ -638,7 +666,11 @@ export default class extends Controller {
     }
   }
 
-  upsert(key, canvas, data, options, mode) {
+  // Creates the chart once real data exists, then fades it in over the
+  // skeleton that held its box.
+  upsert(key, canvas, wrap, data, options, mode) {
+    if (typeof Chart === "undefined") return crossfade(wrap) // script missing — keep the page alive
+
     const chart = this.charts[key]
     if (chart) {
       chart.data = data
@@ -647,6 +679,7 @@ export default class extends Controller {
     } else {
       this.charts[key] = new Chart(canvas, { type: "line", data, options })
     }
+    crossfade(wrap)
   }
 
   // Shared line-chart scaffolding: fonts, muted grid, index tooltip that

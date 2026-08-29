@@ -5,6 +5,9 @@
   <%= javascript_include_tag "chart.umd", "data-turbo-track": "reload" %>
 <% end %>
 
+<%# Nothing below is server-rendered from the database: the page ships as a
+    shell of skeletons and Stimulus fills it from /series, /forecasts/data and
+    /forecasts/accuracy once the HTML is on screen. %>
 <div data-controller="forecasts" class="page page--flush">
   <header class="card hero">
     <div>
@@ -24,11 +27,12 @@
     </div>
   </header>
 
-  <% if @no_snapshots %>
+  <%# Raised from Stimulus when /forecasts/data reports an empty table. %>
+  <div data-forecasts-target="emptyNotice" hidden>
     <%= render "shared/empty_notice",
                text: "Снимков прогнозов ещё нет: АПЭКОН и модель Rateflow сохраняют свои версии при плановых " \
                      "обновлениях, так что графики и таблица заполнятся в течение первого дня работы." %>
-  <% end %>
+  </div>
 
   <section class="section">
     <div class="section__head">
@@ -38,7 +42,10 @@
     <p class="section__desc">Свежая версия прогноза каждого источника продолжает фактическую линию ЦБ РФ.
       Плеер под графиком проигрывает прошлые версии — видно, что обещали раньше.</p>
     <div class="card chart-card chart-card--hero">
-      <div class="chart-wrap"><canvas data-forecasts-target="mainCanvas" role="img" aria-label="Прогноз поверх фактического курса"></canvas></div>
+      <div class="chart-wrap" data-forecasts-target="mainWrap">
+        <canvas data-forecasts-target="mainCanvas" role="img" aria-label="Прогноз поверх фактического курса"></canvas>
+        <div class="chart-skel skel swap__skel" aria-hidden="true"></div>
+      </div>
       <div class="playback" data-forecasts-target="playback" hidden>
         <button type="button" class="playback__btn" data-forecasts-target="playBtn" data-action="forecasts#togglePlay"
                 aria-label="Проиграть историю прогноза">▶</button>
@@ -46,8 +53,8 @@
                data-forecasts-target="playSlider" data-action="input->forecasts#scrub" aria-label="Версия прогноза">
         <span class="playback__label" data-forecasts-target="playLabel"></span>
       </div>
-      <div class="legend" data-forecasts-target="mainLegend"></div>
-      <div class="status-line" data-forecasts-target="mainStatus"></div>
+      <div class="legend" data-forecasts-target="mainLegend"><%= render "shared/skeleton_legend", items: 3 %></div>
+      <div class="status-line" data-forecasts-target="mainStatus"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
     </div>
   </section>
 
@@ -60,8 +67,11 @@
       <p class="section__desc">Все сохранённые версии одним пучком: чем свежее версия, тем плотнее цвет —
         видно, куда дрейфует прогноз.</p>
       <div class="card chart-card">
-        <div class="chart-wrap"><canvas data-forecasts-target="fanCanvas" role="img" aria-label="Все версии прогноза одним веером"></canvas></div>
-        <div class="status-line" data-forecasts-target="fanStatus"></div>
+        <div class="chart-wrap" data-forecasts-target="fanWrap">
+          <canvas data-forecasts-target="fanCanvas" role="img" aria-label="Все версии прогноза одним веером"></canvas>
+          <div class="chart-skel skel swap__skel" aria-hidden="true"></div>
+        </div>
+        <div class="status-line" data-forecasts-target="fanStatus"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
       </div>
     </section>
 
@@ -80,14 +90,17 @@
       <p class="section__desc">X — день снимка, Y — что в тот день обещали на выбранную дату:
         история пересмотров одного обещания.</p>
       <div class="card chart-card">
-        <div class="chart-wrap"><canvas data-forecasts-target="revisionCanvas" role="img" aria-label="История пересмотров прогноза на выбранную дату"></canvas></div>
-        <div class="legend" data-forecasts-target="revisionLegend"></div>
-        <div class="status-line" data-forecasts-target="revisionStatus"></div>
+        <div class="chart-wrap" data-forecasts-target="revisionWrap">
+          <canvas data-forecasts-target="revisionCanvas" role="img" aria-label="История пересмотров прогноза на выбранную дату"></canvas>
+          <div class="chart-skel skel swap__skel" aria-hidden="true"></div>
+        </div>
+        <div class="legend" data-forecasts-target="revisionLegend"><%= render "shared/skeleton_legend", items: 2 %></div>
+        <div class="status-line" data-forecasts-target="revisionStatus"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
       </div>
     </section>
   </div>
 
-  <%= render "accuracy", accuracy: @accuracy %>
+  <%= render "accuracy" %>
 
   <section class="section">
     <div class="section__head">
@@ -100,7 +113,7 @@
         <thead>
           <tr><th>Дата и время снимка</th><th>Провайдер</th><th class="num">Точек</th><th>Дальний горизонт</th></tr>
         </thead>
-        <tbody data-forecasts-target="snapshotsBody"></tbody>
+        <tbody data-forecasts-target="snapshotsBody"><%= render "shared/skeleton_rows", cols: 4, rows: 8 %></tbody>
       </table>
     </div>
     <div class="pager">

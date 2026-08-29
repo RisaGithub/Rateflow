@@ -5,13 +5,21 @@ const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Curren
 const dateRu = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7) + "." + iso.slice(0, 4)
 
 // Instant in-browser conversion using the latest rate shown on the cards.
+// The rates arrive with the dashboard's own /dashboard/data response: the
+// dashboard controller writes them into this value, which recalculates.
 export default class extends Controller {
   static targets = ["amount", "currency", "dir", "result", "note"]
   static values = { rates: Object }
 
-  connect() {
+  // Set before Stimulus fires ratesValueChanged, which runs ahead of connect().
+  initialize() {
     this.dir = "to_rub"
-    this.calc()
+  }
+
+  // Fires once on start with the empty default, then again when the dashboard
+  // hands the real rates over.
+  ratesValueChanged() {
+    if (this.hasCurrencyTarget) this.calc()
   }
 
   setDir(event) {
@@ -25,6 +33,12 @@ export default class extends Controller {
     const info = this.ratesValue[cur]
     const amount = parseFloat(this.amountTarget.value)
 
+    // Nothing has arrived yet — say so instead of claiming the rate is missing.
+    if (!Object.keys(this.ratesValue).length) {
+      this.resultTarget.textContent = "—"
+      this.noteTarget.textContent = "Загрузка курса…"
+      return
+    }
     if (!info?.value) {
       this.resultTarget.textContent = "—"
       this.noteTarget.textContent = `Нет курса для ${cur}`

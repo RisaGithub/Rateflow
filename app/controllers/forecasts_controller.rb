@@ -1,20 +1,14 @@
-# JSON forecast snapshots at GET /forecasts/data: stored versions for one
-# currency, so the charts can draw the latest one and play back the history.
-# Cached the same way as /series.
+# The Прогнозы page plus the two payloads it fills itself from: JSON forecast
+# snapshots at GET /forecasts/data — stored versions for one currency, so the
+# charts can draw the latest one and play back the history — and the accuracy
+# section's HTML at GET /forecasts/accuracy. Both cached the same way as /series.
 class ForecastsController < ApplicationController
   CACHE_TTL = 10.minutes
-  # The page opens on the 90-day period; the same default lives in the
-  # Stimulus controller's initial state — keep the two in sync.
-  DEFAULT_PERIOD_DAYS = 90
 
-  # The Прогнозы page; its charts fetch JSON from #data client-side. Accuracy
-  # is pre-rendered per currency for the default period — the shared switches
-  # toggle visibility, the period switch refetches #accuracy.
+  # The Прогнозы page is a shell of skeletons and touches no table: the charts
+  # and the snapshot table fill from #data, the accuracy block from #accuracy,
+  # and the "fresh deploy" notice rides along in #data's `empty` flag.
   def show
-    @accuracy = accuracy_reports(DEFAULT_PERIOD_DAYS.days.ago.to_date)
-    # Fresh deploy: no snapshots at all — the page leads with a first-run
-    # notice instead of four blocks of empty charts.
-    @no_snapshots = ForecastRun.none?
   end
 
   def data

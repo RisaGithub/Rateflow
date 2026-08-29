@@ -105,6 +105,9 @@ button { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
 svg.icon { flex: none; }
+/* [hidden] has to beat the display rules below — a card, a panel or a chart
+   placeholder carries its own display, which would otherwise keep it on screen. */
+[hidden] { display: none !important; }
 
 .mono, .num, table, input, select {
   font-family: var(--font-mono);
@@ -252,6 +255,87 @@ svg.icon { flex: none; }
 .empty-notice__title { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
 .empty-notice__text { color: var(--text-2); font-size: 12px; margin-top: 4px; max-width: 78ch; }
 
+/* ---------- Skeletons ---------- */
+
+/* Every page here now arrives as an empty shell and fills itself from JSON,
+   so every block needs a placeholder that holds its exact box. One primitive
+   does it: a translucent slab built out of --text, so it reads correctly in
+   both themes and survives a theme switch without being repainted. */
+.skel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg,
+    transparent, color-mix(in srgb, var(--text) 9%, transparent), transparent);
+  animation: skel-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skel-sweep { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
+
+/* A placeholder line borrows the height of the very text it stands in for:
+   it is an inline-block holding a non-breaking space, so its box comes from
+   the surrounding font-size and line-height and nothing shifts on the swap. */
+.skel-line { display: inline-block; vertical-align: top; width: 72px; }
+.skel-line--mid { width: 132px; }
+.skel-line--wide { width: 100%; max-width: 280px; }
+
+/* Skeleton and real content share one grid cell, so the handover is a
+   crossfade in place rather than a jump. */
+.swap { display: grid; }
+.swap > * { grid-area: 1 / 1; min-width: 0; }
+.swap__skel, .swap__content { transition: opacity 180ms ease; }
+.swap__content { opacity: 0; }
+.swap.is-ready .swap__skel { opacity: 0; pointer-events: none; }
+.swap.is-ready .swap__content { opacity: 1; }
+
+/* Blocks whose skeleton *is* the markup being replaced (table bodies, legends,
+   status lines) fade their fresh content in over the same 180 ms. */
+.is-revealed { animation: skel-reveal 180ms ease both; }
+@keyframes skel-reveal { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .is-revealed { animation: none; }
+  .swap__skel, .swap__content { transition: none; }
+}
+
+/* The card placeholder mirrors the real card's grid exactly; only the cursor
+   and the hover affordance are dropped, since there is nothing to click yet. */
+.ccard--skel { cursor: default; }
+.ccard--skel:hover { border-color: var(--line); }
+.ccard--skel .ccard__sym { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ccard--skel .ccard__code .skel-line { width: 42px; }
+.ccard--skel .ccard__name .skel-line { width: 92px; }
+.ccard--skel .ccard__value .skel-line { width: 116px; }
+.ccard--skel .ccard__src .skel-line { width: 108px; }
+.ccard--skel .ccard__delta .skel-line { width: 124px; }
+
+/* The chart placeholder covers the canvas until the first real draw; the two
+   crossfade, so the line never appears on top of a sweeping slab. */
+.chart-skel { position: absolute; inset: 0; transition: opacity 180ms ease; }
+.chart-wrap canvas { opacity: 0; transition: opacity 180ms ease; }
+.chart-wrap.is-ready canvas { opacity: 1; }
+.chart-wrap.is-ready .chart-skel { opacity: 0; }
+
+/* A failed load: the message keeps the block's voice, the button repeats the
+   very request that failed. */
+.load-error { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--text-2); font-size: 12px; }
+.retry-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.retry-btn:hover { border-color: var(--line-strong); color: var(--text); }
+
 /* ---------- Currency cards ---------- */
 
 .cards {
@@ -335,7 +419,6 @@ svg.icon { flex: none; }
 
 .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 .control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.control[hidden] { display: none; }
 .control__label { color: var(--text-3); font-size: 12px; }
 
 /* Source toggles: pill chips, dot colored to match the provider's chart line. */
@@ -387,7 +470,6 @@ svg.icon { flex: none; }
   white-space: nowrap;
   transform-origin: top right;
 }
-.popover[hidden] { display: none; }
 
 /* Opens with a short drop-in from the «Свой» button it hangs under. */
 @media (prefers-reduced-motion: no-preference) {
@@ -417,7 +499,6 @@ svg.icon { flex: none; }
 
 /* Forecast version playback: play button + slider + "version N of M". */
 .playback { display: flex; align-items: center; gap: 12px; }
-.playback[hidden] { display: none; }
 .playback__btn {
   width: 30px;
   height: 30px;
@@ -568,9 +649,6 @@ td.wrap { white-space: normal; min-width: 240px; max-width: 420px; color: var(--
 /* ---------- Sources page ---------- */
 
 .providers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
-/* display:grid would beat the UA's [hidden] rule — the forecasts page hides
-   whole accuracy groups and single cards with the attribute. */
-.providers[hidden], .provider[hidden] { display: none; }
 .provider { padding: 16px; display: grid; gap: 14px; }
 .provider__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .provider__name { font-size: 15px; }

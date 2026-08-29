@@ -4,22 +4,27 @@
   <%= javascript_include_tag "chart.umd", "data-turbo-track": "reload" %>
 <% end %>
 
-<div data-controller="dashboard" data-dashboard-initial-value="<%= @dashboard.initial_series.to_json %>"
-     data-dashboard-rates-value="<%= @dashboard.latest_rates.to_json %>" class="page page--flush">
+<%# Nothing below is server-rendered from the database: the page is a shell of
+    skeletons, and Stimulus fills it from /dashboard/data, /series and
+    /forecasts/data once the HTML is on screen. %>
+<div data-controller="dashboard" class="page page--flush">
   <div>
     <h1 class="page-title">Курсы валют к рублю</h1>
     <p class="page-sub">USD, EUR, CNY и GBP из четырёх независимых источников: ЦБ РФ, ER-API, Currency API и АПЭКОН</p>
   </div>
 
-  <% if @dashboard.empty? %>
+  <%# Raised from Stimulus when /dashboard/data reports an empty database. %>
+  <div data-dashboard-target="emptyNotice" hidden>
     <%= render "shared/empty_notice",
                text: "База только что развёрнута: курсы подтянутся с первым плановым обновлением, " \
                      "обычно в течение пары часов. После этого здесь появятся карточки валют, график и история." %>
-  <% end %>
+  </div>
 
   <section class="cards" aria-label="Валюты">
-    <% @dashboard.cards.each do |card| %>
-      <%= render "card", card: card %>
+    <% Rate::CURRENCIES.each do |code| %>
+      <div class="swap" data-dashboard-target="cardSlot" data-currency="<%= code %>">
+        <%= render "card_skeleton" %>
+      </div>
     <% end %>
   </section>
 
@@ -50,10 +55,13 @@
     </div>
 
     <div class="card chart-card">
-      <div class="chart-wrap"><canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas></div>
-      <div class="legend" data-dashboard-target="legend"></div>
-      <div class="status-line" data-dashboard-target="diverge"></div>
-      <div class="status-line" data-dashboard-target="status"></div>
+      <div class="chart-wrap" data-dashboard-target="chartWrap">
+        <canvas data-dashboard-target="canvas" role="img" aria-label="График курса"></canvas>
+        <div class="chart-skel skel swap__skel" aria-hidden="true"></div>
+      </div>
+      <div class="legend" data-dashboard-target="legend"><%= render "shared/skeleton_legend", items: 4 %></div>
+      <div class="status-line" data-dashboard-target="diverge"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
+      <div class="status-line" data-dashboard-target="status"><span class="skel skel-line skel-line--mid">&nbsp;</span></div>
     </div>
   </section>
 
@@ -66,7 +74,16 @@
       <%# Compact teaser: the nearest common forecast date from each source;
           everything deeper lives on the /forecasts page. %>
       <div class="card panel panel--fill" data-dashboard-target="forecast">
-        <p class="panel__note">Загрузка прогноза…</p>
+        <span class="skel skel-line skel-line--wide">&nbsp;</span>
+        <div class="forecast-cells">
+          <% 2.times do %>
+            <div class="forecast-cell">
+              <div class="panel__label"><span class="skel skel-line skel-line--mid">&nbsp;</span></div>
+              <div class="panel__big"><span class="skel skel-line skel-line--mid">&nbsp;</span></div>
+              <div class="forecast-cell__delta"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
+            </div>
+          <% end %>
+        </div>
       </div>
     </div>
 
@@ -75,7 +92,10 @@
         <%= render "shared/icon", name: "convert" %>
         <h2 class="section__title">Конвертер</h2>
       </div>
-      <div class="card panel panel--fill" data-controller="converter" data-converter-rates-value="<%= @dashboard.latest_rates.to_json %>">
+      <%# Rates arrive with /dashboard/data; the dashboard controller hands
+          them over by writing this value. %>
+      <div class="card panel panel--fill" data-controller="converter" data-dashboard-target="converter"
+           data-converter-rates-value="{}">
         <div class="converter__grid">
           <div class="field">
             <label for="conv-amount">Сумма</label>
@@ -120,7 +140,7 @@
         <thead>
           <tr><th>Дата</th><th class="num">Курс, ₽</th><th class="num">Изменение</th><th class="num">%</th><th>Источник</th></tr>
         </thead>
-        <tbody data-dashboard-target="tbody"></tbody>
+        <tbody data-dashboard-target="tbody"><%= render "shared/skeleton_rows", cols: 5, rows: 8 %></tbody>
       </table>
     </div>
   </section>

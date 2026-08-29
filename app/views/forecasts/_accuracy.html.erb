@@ -1,8 +1,9 @@
 <%# Matured-forecast scoring per provider, horizon buckets only. Deliberately
     no headline MAE/MAPE per provider: our model forecasts 7 days ahead,
     АПЭКОН — years, so a single number would grade incomparably hard tasks
-    with one scale. The groups live in _accuracy_groups so the period switch
-    can refetch them from GET /forecasts/accuracy without touching the shell. %>
+    with one scale. The groups live in _accuracy_groups, fetched from
+    GET /forecasts/accuracy — on the first render and again on every period
+    switch — so the page shell itself costs no scoring queries. %>
 <section class="section">
   <div class="section__head">
     <span class="section__badge"><%= render "shared/icon", name: "target" %></span>
@@ -11,6 +12,23 @@
   <p class="section__desc">Подсвечены корзины, где сбывшиеся точки есть у обоих провайдеров: чем дальше горизонт,
     тем больше ошибка у любой модели, поэтому числа из разных корзин между собой не сравниваются.</p>
   <div data-forecasts-target="accuracyBox">
-    <%= render "accuracy_groups", accuracy: accuracy, scoped: true %>
+    <div class="providers" aria-hidden="true">
+      <% 2.times do %>
+        <div class="card provider">
+          <div class="provider__head">
+            <div>
+              <h3 class="provider__name"><span class="skel skel-line skel-line--mid">&nbsp;</span></h3>
+              <div class="provider__desc"><span class="skel skel-line skel-line--wide">&nbsp;</span></div>
+            </div>
+          </div>
+          <table class="accuracy-table">
+            <thead>
+              <tr><th>Горизонт прогноза</th><th class="num">Сравнений</th><th class="num">MAE, ₽</th><th class="num">MAPE</th></tr>
+            </thead>
+            <tbody><%= render "shared/skeleton_rows", cols: 4, rows: 6 %></tbody>
+          </table>
+        </div>
+      <% end %>
+    </div>
   </div>
 </section>

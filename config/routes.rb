@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   root "dashboard#show"
+  get "dashboard/data", to: "dashboard#data"
   get "series", to: "series#show"
   get "forecasts", to: "forecasts#show"
   get "forecasts/data", to: "forecasts#data"

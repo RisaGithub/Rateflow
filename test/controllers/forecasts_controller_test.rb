@@ -6,13 +6,18 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
                       points: [ { horizon_date: Date.new(2026, 9, 1), value: BigDecimal(value), low: nil, high: nil } ])
   end
 
-  test "GET /forecasts renders the page with shared controls" do
+  test "GET /forecasts renders a shell of skeletons, with no data embedded" do
+    store("apecon", "USD", Time.utc(2026, 8, 22), "81")
+
     get forecasts_path
 
     assert_response :success
     assert_select "h1", text: "Прогнозы курса"
     assert_select "[data-controller=forecasts]"
-    assert_select "[data-forecasts-target=accuracyGroup]", count: Rate::CURRENCIES.size
+    # Snapshots and accuracy now arrive over JSON/HTML fetches, not in the page.
+    assert_select "[data-forecasts-target=accuracyGroup]", count: 0
+    assert_no_match "81,00", response.body
+    assert_select ".chart-skel", count: 3
   end
 
   test "returns every snapshot for the currency, oldest first, both providers" do

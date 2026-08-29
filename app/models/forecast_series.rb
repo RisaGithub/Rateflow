@@ -19,12 +19,15 @@ class ForecastSeries
     @to = to
   end
 
-  # { currency:, series: { "apecon" => { runs: [...], index: [ { id:,
+  # { currency:, empty:, series: { "apecon" => { runs: [...], index: [ { id:,
   #   captured_at:, points_count:, horizon_to: } ] } } }
   # With latest_only only the newest run per provider and no index — the
-  # dashboard teaser needs nothing more.
+  # dashboard teaser needs nothing more. `empty` says no provider has ever
+  # stored a snapshot, which is what raises the page's first-run notice; it is
+  # about the whole table, not about this currency or period.
   def as_json(*)
-    { currency: @currency, series: @providers.index_with { |provider| provider_series(provider) } }
+    { currency: @currency, empty: ForecastRun.none?,
+      series: @providers.index_with { |provider| provider_series(provider) } }
   end
 
   # One full snapshot in the same shape as a `runs` entry — for the table's
