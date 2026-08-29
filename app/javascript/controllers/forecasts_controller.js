@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { crossfade, dropSkeleton, fadeIn } from "lib/skeletons"
+import { entryAnimation, reducedMotion, upsertChart } from "lib/chart_upsert"
 
 const FORECAST_NAMES = { apecon: "Прогноз АПЭКОН", internal: "Прогноз Rateflow" }
 const SOURCE_NAMES = { apecon: "АПЭКОН", internal: "Rateflow" }
@@ -302,7 +303,7 @@ export default class extends Controller {
   // Steps through versions in a loop, ~600 ms per snapshot.
   startPlay() {
     const total = this.runs(this.playbackProvider()).length
-    if (total < 2 || this.reducedMotion()) return
+    if (total < 2 || reducedMotion()) return
     this.playTimer = setInterval(() => {
       const runs = this.runs(this.playbackProvider())
       this.runIndex = ((this.runIndex ?? runs.length - 1) + 1) % runs.length
@@ -314,10 +315,6 @@ export default class extends Controller {
   stopPlay() {
     if (this.playTimer) clearInterval(this.playTimer)
     this.playTimer = null
-  }
-
-  reducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
   }
 
   renderPlayback() {
@@ -332,7 +329,7 @@ export default class extends Controller {
     this.playSliderTarget.value = index
     this.playLabelTarget.textContent =
       `${SOURCE_NAMES[this.playbackProvider()]} · ${dateRu(runs[index].captured_at.slice(0, 10))} · версия ${index + 1} из ${runs.length}`
-    this.playBtnTarget.hidden = this.reducedMotion()
+    this.playBtnTarget.hidden = reducedMotion()
     this.playBtnTarget.textContent = this.playTimer ? "⏸" : "▶"
     this.playBtnTarget.setAttribute("aria-label", this.playTimer ? "Пауза" : "Проиграть историю прогноза")
   }
@@ -666,20 +663,11 @@ export default class extends Controller {
     }
   }
 
-  // Creates the chart once real data exists, then fades it in over the
-  // skeleton that held its box.
+  // Creates the chart once real data exists and updates it silently ever
+  // after, then fades it in over the skeleton that held its box.
   upsert(key, canvas, wrap, data, options, mode) {
     if (typeof Chart === "undefined") return crossfade(wrap) // script missing — keep the page alive
-
-    const chart = this.charts[key]
-    if (chart) {
-      chart.data = data
-      chart.options = options
-      chart.update(mode)
-    } else {
-      this.charts[key] = new Chart(canvas, { type: "line", data, options })
-    }
-    crossfade(wrap)
+    if (upsertChart(this.charts, key, canvas, data, options, mode)) crossfade(wrap)
   }
 
   // Shared line-chart scaffolding: fonts, muted grid, index tooltip that
@@ -695,7 +683,7 @@ export default class extends Controller {
     return {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: this.reducedMotion() ? 0 : 250 },
+      animation: entryAnimation(),
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },

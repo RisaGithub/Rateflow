@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { crossfade, dropSkeleton, fadeIn } from "lib/skeletons"
+import { entryAnimation, upsertChart } from "lib/chart_upsert"
 
 const PROVIDER_NAMES = { cbr: "ЦБ РФ", erapi: "ER-API", currencyapi: "Currency API", apecon: "АПЭКОН", internal: "Rateflow" }
 const RATE_PROVIDERS = ["cbr", "erapi", "currencyapi", "apecon"]
@@ -238,10 +239,6 @@ export default class extends Controller {
     }
   }
 
-  reducedMotion() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  }
-
   latestRun(provider) {
     return this.forecastPayload?.series?.[provider]?.runs?.at(-1) || null
   }
@@ -466,7 +463,7 @@ export default class extends Controller {
     const options = {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: this.reducedMotion() ? 0 : 250 },
+      animation: entryAnimation(),
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { display: false },
@@ -501,14 +498,7 @@ export default class extends Controller {
       }
     }
 
-    if (this.charts.main) {
-      this.charts.main.data = data
-      this.charts.main.options = options
-      this.charts.main.update()
-    } else {
-      this.charts.main = new Chart(this.canvasTarget, { type: "line", data, options })
-    }
-    this.revealChart()
+    if (upsertChart(this.charts, "main", this.canvasTarget, data, options)) this.revealChart()
   }
 
   // Vertical fill from ~18% opacity at the top to 0 at the bottom.
