@@ -98,7 +98,7 @@ Plain GET with a shared token, because many free schedulers can only GET:
 
 ```
 GET /cron/refresh?token=...     # rates: the three API providers, last 14 days (seconds, no apecon.ru visits)
-GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stalest, quote saved too) + internal for all
+GET /cron/forecasts?token=...   # forecasts: the internal one for every currency (its АПЭКОН half cannot run on the server — see below)
 ```
 
 `/cron/refresh` is meant to be **attempted every two hours** — often enough that a new CBR rate shows up within the hours it is published, cheap enough to be free. Trying often only works because a try that finds nothing new costs nothing: the providers resend two weeks of history every time, and only rows whose value actually changed are written. On a quiet run nothing is touched, `updated_at` does not move, the JSON caches keyed on it survive, and the internal forecast is not recomputed. The response spells both numbers out:
@@ -113,13 +113,15 @@ GET /cron/forecasts?token=...   # forecasts: one АПЭКОН currency (the stal
 - The same update having run less than 10 minutes ago → `{"status":"skipped"}` with no network calls. That is a guard against a double call, not a schedule: it does not get in the way of a two-hourly one.
 - Both endpoints (and `/admin`) are rate-limited to 20 requests per minute per IP; past that the answer is 429.
 - The day's first successful `/cron/refresh` also prunes housekeeping data (see `logs:prune` below), so no separate cleanup scheduler is needed.
-- `/cron/forecasts` touches **one** currency per call (АПЭКОН's 10 s crawl delay makes four too slow for one request). Schedule it ~4 times a day and every currency rotates through within a day.
+- `/cron/forecasts` recomputes the internal Rateflow forecast for all four currencies. That half is a rolling mean over rates already in the database — no outside request at all — so it always works on the server.
+- The same endpoint also *attempts* one АПЭКОН currency (the stalest — the site's 10 s crawl delay makes four too slow for one request), but that half cannot succeed from the deployed service. apecon.ru sits behind an sgcaptcha bot check that challenges by IP address and answers a datacenter address with a 168-byte meta-refresh stub, status 200, instead of the page. `Providers::Apecon` recognises the stub and reports a bot check, so the fetch log says what actually happened rather than blaming a redesign that did not occur — and the internal half of the call is unaffected.
+- АПЭКОН snapshots are refreshed instead by a scheduled client running outside the deployment, through the same `rake forecasts:fetch`. `ForecastsFetcher` keeps the site's 10-second pause and skips any currency refreshed within the last day, so even hourly attempts mean at most one page load per currency per day.
 
 Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 ```
 0 */2 * * *          curl -fsS "https://your-app/cron/refresh?token=$CRON_TOKEN"
-30 6,10,14,18 * * *  curl -fsS "https://your-app/cron/forecasts?token=$CRON_TOKEN"
+30 6 * * *           curl -fsS "https://your-app/cron/forecasts?token=$CRON_TOKEN"
 ```
 
 ### Admin page
@@ -136,7 +138,7 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 ### Serving the chart
 
-The page embeds only the initial series; every switch fetches `GET /series?currency=USD&providers=cbr,erapi&from=…&to=…`. Responses are cached for 10 minutes (keyed by the query plus the table's max `updated_at`) and downsampled server-side to ~400 points, so the all-time chart stays fast on tens of thousands of rows. `/forecasts/data` follows the same caching rules.
+Pages ship as an empty frame behind skeletons and ask for their data afterwards: the dashboard fetches `GET /dashboard/data` (cards and quotes) together with `GET /series?currency=USD&providers=cbr,erapi&from=…&to=…`, and every switch refetches the series. Responses are cached for 10 minutes (keyed by the query plus the table's max `updated_at`) and downsampled server-side to ~400 points, so the all-time chart stays fast on tens of thousands of rows. `/forecasts/data` follows the same caching rules.
 
 ## Pages
 

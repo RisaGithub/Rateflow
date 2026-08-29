@@ -13,8 +13,8 @@ class ForecastsFetcher
   MIN_AGE = 24.hours
   CRAWL_DELAY = 10 # seconds between АПЭКОН page loads, per its robots.txt
 
-  # Refreshes several currencies in one sitting — the laptop-side counterpart
-  # of hitting /cron/forecasts once per currency. Each iteration goes through
+  # Refreshes several currencies in one sitting — the console counterpart of
+  # hitting /cron/forecasts once per currency. Each iteration goes through
   # the same single-currency #call (quote saved, attempt logged), pausing
   # CRAWL_DELAY between page loads; a "fresh" result made no request, so no
   # pause follows it. Returns one summary hash per currency, in order.
