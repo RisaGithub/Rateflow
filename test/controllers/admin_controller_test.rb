@@ -44,6 +44,43 @@ class AdminControllerTest < ActionDispatch::IntegrationTest
     assert_match "Обновить курсы", response.body
   end
 
+  # The top line answers "is the schedule alive?", so only origin "task"
+  # counts: the endpoint is also hit by hand from this very page.
+  test "a fresh endpoint check does not pass for a working schedule" do
+    RefreshCheck.create!(kind: "forecast", origin: "endpoint", outcome: "skipped",
+                         detail: "обновлено меньше суток назад")
+
+    get admin_path, headers: basic("admin", "pass")
+
+    assert_response :success
+    assert_match "Плановые проверки", response.body
+    assert_match "Расписание молчит", response.body
+    assert_match "Проверок по команде ещё не было", response.body
+    assert_match "эндпоинт", response.body
+  end
+
+  test "a task check older than two hours is flagged as a problem" do
+    RefreshCheck.create!(kind: "forecast", origin: "task", outcome: "skipped",
+                         detail: "обновлено меньше суток назад", created_at: 3.hours.ago)
+
+    get admin_path, headers: basic("admin", "pass")
+
+    assert_match "Расписание молчит", response.body
+    assert_match "3 ч назад", response.body
+  end
+
+  test "a recent task check reads as a working schedule, with its row below" do
+    RefreshCheck.create!(kind: "forecast", origin: "task", outcome: "fetched",
+                         currency: "USD", detail: "12 точек", created_at: 20.minutes.ago)
+
+    get admin_path, headers: basic("admin", "pass")
+
+    assert_match "Расписание работает", response.body
+    assert_match "20 мин назад", response.body
+    assert_match "Обновлено", response.body
+    assert_match "12 точек", response.body
+  end
+
   test "rebuild internal button recomputes and redirects with a flash" do
     post admin_rebuild_internal_path, headers: basic("admin", "pass")
 

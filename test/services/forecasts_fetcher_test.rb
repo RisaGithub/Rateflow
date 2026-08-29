@@ -91,6 +91,74 @@ class ForecastsFetcherTest < ActiveSupport::TestCase
     assert_empty provider.fetched
   end
 
+  # The check journal exists exactly for this case: nothing was requested, so
+  # fetch_logs stays silent, but the schedule did run and must show it.
+  test "a skip for freshness is journalled as a check and not as a fetch attempt" do
+    store("USD", 2.hours.ago)
+
+    ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[USD]).call
+
+    check = RefreshCheck.recent.first
+    assert_equal "skipped", check.outcome
+    assert_equal "forecast", check.kind
+    assert_nil check.currency
+    assert_match(/суток/, check.detail)
+    assert_not FetchLog.exists?
+  end
+
+  test "a successful collection is journalled in both tables, with the point count" do
+    ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[USD]).call
+
+    check = RefreshCheck.recent.first
+    assert_equal "fetched", check.outcome
+    assert_equal "USD", check.currency
+    assert_equal "2 точек", check.detail
+    assert_equal 1, RefreshCheck.count
+    assert FetchLog.for_kind("forecast").succeeded.exists?
+  end
+
+  test "a provider failure is journalled as a failed check with its message" do
+    provider = FakeProvider.new(error: Providers::Error.new("HTTP 500", http_status: 500))
+
+    result = ForecastsFetcher.new(provider: provider, currencies: %w[USD]).call
+
+    assert_equal "error", result[:status]
+    check = RefreshCheck.recent.first
+    assert_equal "failed", check.outcome
+    assert_equal "USD", check.currency
+    assert_equal "HTTP 500", check.detail
+  end
+
+  # The journal is a signal about the schedule, not part of the collection:
+  # an insert that fails costs a line in the Rails log and nothing else.
+  test "a journal that refuses to be written never breaks the collection" do
+    RefreshCheck.define_singleton_method(:create!) { |**| raise ActiveRecord::StatementInvalid, "refresh_checks is gone" }
+
+    result = ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[USD]).call
+
+    assert_equal "ok", result[:status]
+    assert_equal 2, result[:points]
+    assert_equal 0, RefreshCheck.count
+    assert_equal 1, ForecastRun.where(provider: "apecon", currency: "USD").count
+  ensure
+    RefreshCheck.singleton_class.remove_method(:create!)
+  end
+
+  test "checks come from the endpoint by default and from the task when it asks" do
+    ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[USD]).call
+    assert_equal "endpoint", RefreshCheck.find_by!(currency: "USD").origin
+
+    ForecastsFetcher.new(provider: FakeProvider.new, currencies: %w[EUR], origin: "task").call
+    assert_equal "task", RefreshCheck.find_by!(currency: "EUR").origin
+  end
+
+  test "fetch_all passes its origin down to every check it writes" do
+    ForecastsFetcher.fetch_all(currencies: %w[USD EUR], provider: FakeProvider.new,
+                               sleeper: ->(_) { }, origin: "task")
+
+    assert_equal %w[task task], RefreshCheck.pluck(:origin)
+  end
+
   test "fetch_all walks the currencies in order, pausing between page loads" do
     provider = FakeProvider.new
     slept = []

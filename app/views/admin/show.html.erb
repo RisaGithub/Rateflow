@@ -73,8 +73,56 @@
 
 <section class="section">
   <div class="section__head">
+    <%= render "shared/icon", name: "target" %>
+    <h2 class="section__title">Плановые проверки</h2>
+  </div>
+  <div class="card panel">
+    <%# The one line the whole block exists for: is the schedule still alive?
+        Only origin "task" answers it — the endpoint is hit by hand too. %>
+    <% silent = @last_task_check.nil? || @last_task_check.created_at.before?(RefreshCheck::SILENCE_LIMIT.ago) %>
+    <p>
+      <span class="pill <%= silent ? "pill--fail" : "pill--ok" %>">
+        <%= silent ? "Расписание молчит" : "Расписание работает" %>
+      </span>
+      <% if @last_task_check %>
+        Последняя проверка по команде — <%= l(@last_task_check.created_at, format: :short_ru) %>,
+        <%= elapsed_ru(@last_task_check.created_at) %> назад.
+      <% else %>
+        Проверок по команде ещё не было.
+      <% end %>
+    </p>
+    <p class="panel__note">Журнал отвечает на вопрос «работает ли расписание», а не «отвечает ли источник»:
+      сюда попадает и проверка, решившая, что всё свежее, и потому не сделавшая ни одного запроса.
+      Молчание дольше двух часов означает, что клиент по расписанию вне развёртывания
+      перестал приходить.</p>
+  </div>
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr><th>Время</th><th>Откуда</th><th>Валюта</th><th>Исход</th><th>Расшифровка</th></tr>
+      </thead>
+      <tbody>
+        <% if @checks.empty? %>
+          <tr><td colspan="5" class="table-empty">Проверок нет</td></tr>
+        <% end %>
+        <% @checks.each do |check| %>
+          <tr>
+            <td><%= l(check.created_at, format: :short_ru) %></td>
+            <td class="muted"><%= origin_name(check.origin) %></td>
+            <td><%= check.currency || "—" %></td>
+            <td><span class="pill <%= outcome_pill(check.outcome) %>"><%= outcome_name(check.outcome) %></span></td>
+            <td class="wrap"><%= check.detail.presence || "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section__head">
     <%= render "shared/icon", name: "log" %>
-    <h2 class="section__title">Последние 20 записей журнала</h2>
+    <h2 class="section__title">Последние 20 обращений к источникам</h2>
   </div>
   <div class="card table-wrap">
     <table>

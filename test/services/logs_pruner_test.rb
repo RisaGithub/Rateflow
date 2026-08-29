@@ -12,6 +12,17 @@ class LogsPrunerTest < ActiveSupport::TestCase
     assert FetchLog.exists?(fresh.id)
   end
 
+  test "removes refresh checks older than a month and keeps fresh ones" do
+    old = RefreshCheck.create!(kind: "forecast", origin: "task", outcome: "skipped", created_at: 31.days.ago)
+    fresh = RefreshCheck.create!(kind: "forecast", origin: "task", outcome: "skipped", created_at: 29.days.ago)
+
+    removed = LogsPruner.new.call
+
+    assert_equal 1, removed[:refresh_checks]
+    assert_not RefreshCheck.exists?(old.id)
+    assert RefreshCheck.exists?(fresh.id)
+  end
+
   test "removes stale internal snapshots with their points but never apecon ones" do
     points = [ { horizon_date: Date.new(2026, 9, 1), value: "80" } ]
     stale = ForecastRun.store(provider: "internal", currency: "USD", points: points,

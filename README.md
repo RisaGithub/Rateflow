@@ -20,18 +20,20 @@ apecon.ru (HTML) ─────────────▶  ForecastsFetcher �
                                  InternalForecast ─┴──────────▶ forecast_runs ──▶ /forecasts, /forecasts/data
                                                                 + forecast_points
 every fetch attempt ──────────▶  (logged inline) ─────────────▶ fetch_logs ─────▶ /sources, /admin
+every scheduled check ────────▶  (logged inline) ─────────────▶ refresh_checks ──▶ /admin
 ```
 
 An external scheduler GETs `/cron/refresh` and `/cron/forecasts`; the controllers call the same service objects the admin buttons and rake tasks use, everything runs inside the request (no queues), results are upserted, and every attempt lands in `fetch_logs`. Pages themselves query nothing: `/` and `/forecasts` render a shell of skeletons and fill it from JSON (`/dashboard/data`, `/series`, `/forecasts/data`) and one HTML fragment (`/forecasts/accuracy`). Those go through thin read models (`Dashboard`, `RateSeries`, `ForecastSeries`, `ForecastAccuracy`) that keep the heavy lifting in SQL, and are cached for 10 minutes, invalidated by the tables' `max(updated_at)`.
 
 ## Data schema
 
-Four tables, no users, no queues:
+Five tables, no users, no queues:
 
 - **rates** — one row per (currency, provider, date): the fact. Unique index on the triple; upserts keep re-fetches idempotent, and a row is only written when its value actually changed, so a fetch that brings nothing new leaves `updated_at` — and the caches keyed on it — alone.
 - **forecast_runs** — one stored forecast snapshot: provider (`apecon` / `internal`), currency, `captured_at`. A snapshot identical to the previous one only bumps `captured_at`.
 - **forecast_points** — the payload of a run: horizon date, predicted value, optional min–max corridor. `belongs_to :forecast_run`, unique per (run, horizon date).
 - **fetch_logs** — journal of every call to every source: provider, kind (`rates` / `forecast`), ok flag, HTTP status, duration, error, rows written. Feeds `/sources`, `/admin` and the cron throttle; pruned after 90 days.
+- **refresh_checks** — journal of the scheduled checks themselves: kind, origin (`task` / `endpoint`), currency, outcome (`fetched` / `skipped` / `failed`), a short detail. One row per forecast check, the ones that skipped the network included, so `/admin` can answer "is the schedule still running?" without a skip counting against a provider's availability on `/sources`. Pruned after 30 days.
 
 ## Run locally
 
@@ -116,6 +118,7 @@ GET /cron/forecasts?token=...   # forecasts: the internal one for every currency
 - `/cron/forecasts` recomputes the internal Rateflow forecast for all four currencies. That half is a rolling mean over rates already in the database — no outside request at all — so it always works on the server.
 - The same endpoint also *attempts* one АПЭКОН currency (the stalest — the site's 10 s crawl delay makes four too slow for one request), but that half cannot succeed from the deployed service. apecon.ru sits behind an sgcaptcha bot check that challenges by IP address and answers a datacenter address with a 168-byte meta-refresh stub, status 200, instead of the page. `Providers::Apecon` recognises the stub and reports a bot check, so the fetch log says what actually happened rather than blaming a redesign that did not occur — and the internal half of the call is unaffected.
 - АПЭКОН snapshots are refreshed instead by a scheduled client running outside the deployment, through the same `rake forecasts:fetch`. `ForecastsFetcher` keeps the site's 10-second pause and skips any currency refreshed within the last day, so even hourly attempts mean at most one page load per currency per day.
+- Every such check lands in a journal of its own, `refresh_checks`, visible on `/admin` — including a check that made no request at all because everything was still fresh, which is exactly the case `fetch_logs` cannot record and the one that tells a silent scheduler apart from a quiet one.
 
 Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
@@ -126,7 +129,7 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 
 ### Admin page
 
-`/admin` (HTTP Basic from `ADMIN_USER` / `ADMIN_PASSWORD`) shows row counts and date coverage per provider, forecast snapshot counts, the last 20 FetchLog entries, and buttons for: refresh rates (14 days), backfill one year of CBR history, refresh forecasts (one currency), recompute the internal forecast. Buttons disable while submitting (Turbo). The full archive load stays a rake task: `bin/rails "rates:backfill[1999-01-01]"`.
+`/admin` (HTTP Basic from `ADMIN_USER` / `ADMIN_PASSWORD`) shows row counts and date coverage per provider, forecast snapshot counts, the last 20 scheduled checks with the age of the newest one from `task`, the last 20 FetchLog entries, and buttons for: refresh rates (14 days), backfill one year of CBR history, refresh forecasts (one currency), recompute the internal forecast. Buttons disable while submitting (Turbo). The full archive load stays a rake task: `bin/rails "rates:backfill[1999-01-01]"`.
 
 ### Rake tasks
 
@@ -134,7 +137,7 @@ Example (cron-job.org, GitHub Actions cron, Render Cron hitting a URL):
 - `rake forecasts:fetch[currency]` — АПЭКОН forecasts from the console: one currency, or (without the argument) all four in turn with the site's mandatory 10-second pause between page loads (~1 min). Same code path as `/cron/forecasts`, so today's АПЭКОН quote lands in `rates` along the way and a currency refreshed less than a day ago is skipped.
 - `rake forecasts:backtest[days]` — replays the internal forecast daily over the last `days` (default 180) of CBR facts; deterministic and idempotent.
 - `rake rates:backfill[from]` — one-off archive load: CBR in year-sized slices per currency since `from` (default 1999-01-01), Currency API sampled weekly over the last two years, 300 ms pause between requests.
-- `rake logs:prune[days]` — housekeeping (also run automatically once a day by `/cron/refresh`). Deletes fetch-log rows older than `days` (default 90) — the sources page only ever shows recent attempts, so an unbounded journal is pure dead weight — and internal forecast snapshots older than a year, which lose nothing because the model is deterministic and `forecasts:backtest` can replay them from CBR facts at any moment. АПЭКОН snapshots are **never** deleted: they were scraped at a point in time and cannot be recovered.
+- `rake logs:prune[days]` — housekeeping (also run automatically once a day by `/cron/refresh`). Deletes fetch-log rows older than `days` (default 90) — the sources page only ever shows recent attempts, so an unbounded journal is pure dead weight — scheduled-check rows older than 30 days — at roughly 24 a day that keeps the table under a thousand rows — and internal forecast snapshots older than a year, which lose nothing because the model is deterministic and `forecasts:backtest` can replay them from CBR facts at any moment. АПЭКОН snapshots are **never** deleted: they were scraped at a point in time and cannot be recovered.
 
 ### Serving the chart
 

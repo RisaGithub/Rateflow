@@ -21,7 +21,7 @@ class ForecastsFetchTaskTest < ActiveSupport::TestCase
 
   test "without an argument the task walks all four currencies" do
     captured = nil
-    fake = ->(currencies:) { captured = currencies; currencies.map { |c| { status: "fresh", currency: c } } }
+    fake = ->(currencies:, origin:) { captured = currencies; currencies.map { |c| { status: "fresh", currency: c } } }
 
     out, = capture_io do
       stubbing_fetch_all(fake) { Rake::Task["forecasts:fetch"].invoke }
@@ -33,7 +33,7 @@ class ForecastsFetchTaskTest < ActiveSupport::TestCase
 
   test "a currency argument narrows the run, case-insensitively" do
     captured = nil
-    fake = ->(currencies:) { captured = currencies; [ { status: "ok", currency: "EUR", points: 12, quote_rows: 1 } ] }
+    fake = ->(currencies:, origin:) { captured = currencies; [ { status: "ok", currency: "EUR", points: 12, quote_rows: 1 } ] }
 
     out, = capture_io do
       stubbing_fetch_all(fake) { Rake::Task["forecasts:fetch"].invoke("eur") }
@@ -41,6 +41,19 @@ class ForecastsFetchTaskTest < ActiveSupport::TestCase
 
     assert_equal %w[EUR], captured
     assert_match(/EUR: ok \(12 points, 1 quote rows\)/, out)
+  end
+
+  # The whole point of the journal's origin column: a run started from the
+  # console must be distinguishable from someone poking the endpoint.
+  test "the task marks its checks as coming from the command line" do
+    captured = nil
+    fake = ->(currencies:, origin:) { captured = origin; [] }
+
+    capture_io do
+      stubbing_fetch_all(fake) { Rake::Task["forecasts:fetch"].invoke("usd") }
+    end
+
+    assert_equal "task", captured
   end
 
   test "an unknown currency aborts before touching the site" do

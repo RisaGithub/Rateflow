@@ -19,6 +19,8 @@ class AdminController < ApplicationController
                                  .to_h { |provider, count, last| [ provider, { count: count, last: last } ] }
     @last_update = [ Rate.maximum(:updated_at), ForecastRun.maximum(:updated_at) ].compact.max
     @logs = FetchLog.recent.limit(20)
+    @checks = RefreshCheck.recent.limit(20)
+    @last_task_check = RefreshCheck.for_origin("task").recent.first
   end
 
   # Rates for the last 14 days from the three API providers (also re-snapshots

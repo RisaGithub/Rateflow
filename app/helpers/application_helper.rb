@@ -49,6 +49,36 @@ module ApplicationHelper
 
   def date_ru(date) = date&.strftime("%d.%m.%Y")
 
+  ORIGIN_NAMES = { "task" => "команда", "endpoint" => "эндпоинт" }.freeze
+
+  def origin_name(origin) = ORIGIN_NAMES.fetch(origin, origin)
+
+  OUTCOME_NAMES = { "fetched" => "Обновлено", "skipped" => "Пропуск", "failed" => "Ошибка" }.freeze
+
+  def outcome_name(outcome) = OUTCOME_NAMES.fetch(outcome, outcome)
+
+  # A skip is neither good news nor bad — it is the schedule working with
+  # nothing to do, so it stays grey rather than borrowing the failure colour.
+  OUTCOME_PILLS = { "fetched" => "pill--ok", "failed" => "pill--fail", "skipped" => "pill--muted" }.freeze
+
+  def outcome_pill(outcome) = OUTCOME_PILLS.fetch(outcome, "pill--muted")
+
+  # "8 мин", "2 ч 5 мин", "3 сут 4 ч" — coarse on purpose: the two units that
+  # matter, and no Russian plural forms to get wrong.
+  def elapsed_ru(from, to: Time.current)
+    seconds = (to - from).round
+    return "меньше минуты" if seconds < 60
+
+    days, rest = seconds.divmod(86_400)
+    hours, rest = rest.divmod(3_600)
+    minutes = rest / 60
+    parts = if days.positive? then [ "#{days} сут", ("#{hours} ч" if hours.positive?) ]
+    elsif hours.positive? then [ "#{hours} ч", ("#{minutes} мин" if minutes.positive?) ]
+    else [ "#{minutes} мин" ]
+    end
+    parts.compact.join(" ")
+  end
+
   # Provider errors often quote the URL that failed, query string and all.
   # Those parameters are noise on a public page at best, so the log shows the
   # address without them.

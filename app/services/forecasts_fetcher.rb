@@ -12,6 +12,7 @@
 class ForecastsFetcher
   MIN_AGE = 24.hours
   CRAWL_DELAY = 10 # seconds between АПЭКОН page loads, per its robots.txt
+  DEFAULT_ORIGIN = "endpoint" # the cron endpoint and the admin button; the rake task passes "task"
 
   # Refreshes several currencies in one sitting — the console counterpart of
   # hitting /cron/forecasts once per currency. Each iteration goes through
@@ -19,25 +20,30 @@ class ForecastsFetcher
   # CRAWL_DELAY between page loads; a "fresh" result made no request, so no
   # pause follows it. Returns one summary hash per currency, in order.
   def self.fetch_all(currencies: Rate::CURRENCIES, provider: Providers::Apecon.new,
-                     delay: CRAWL_DELAY, sleeper: Kernel.method(:sleep))
+                     delay: CRAWL_DELAY, sleeper: Kernel.method(:sleep), origin: DEFAULT_ORIGIN)
     results = []
     currencies.each do |currency|
       sleeper.call(delay) unless results.empty? || results.last[:status] == "fresh"
-      results << new(provider: provider, currencies: [ currency ]).call.merge(currency: currency)
+      results << new(provider: provider, currencies: [ currency ], origin: origin).call.merge(currency: currency)
     end
     results
   end
 
-  def initialize(provider: Providers::Apecon.new, currencies: Rate::CURRENCIES)
+  def initialize(provider: Providers::Apecon.new, currencies: Rate::CURRENCIES, origin: DEFAULT_ORIGIN)
     @provider = provider
     @currencies = currencies
+    @origin = origin
   end
 
   # Returns a summary hash: { status:, currency:, points: } or { status: "fresh" }.
   # Any provider failure is recorded in FetchLog and reported, never raised.
+  # Every outcome, the early "fresh" exit included, leaves one RefreshCheck.
   def call
     currency = stalest_currency
-    return { status: "fresh" } unless currency
+    unless currency
+      record_check(outcome: "skipped", detail: "обновлено меньше суток назад")
+      return { status: "fresh" }
+    end
 
     started = now_ms
     result = @provider.fetch_forecast(currency)
@@ -45,13 +51,16 @@ class ForecastsFetcher
                             points: result.points, source_url: result.source_url)
     quote_rows = store_quote(currency)
     log(started, ok: true, status: result.http_status, count: result.points.size)
+    record_check(outcome: "fetched", currency: currency, detail: "#{run.points_count} точек")
     { status: "ok", currency: currency, points: run.points_count,
       quote_rows: quote_rows, captured_at: run.captured_at }
   rescue Providers::Error => e
     log(started, ok: false, status: e.http_status, error: e.message)
+    record_check(outcome: "failed", currency: currency, detail: e.message)
     { status: "error", currency: currency, error: e.message }
   rescue StandardError => e
     log(started, ok: false, error: "#{e.class}: #{e.message}")
+    record_check(outcome: "failed", currency: currency, detail: "#{e.class}: #{e.message}")
     { status: "error", currency: currency, error: e.message }
   end
 
@@ -83,6 +92,16 @@ class ForecastsFetcher
       provider: @provider.key, kind: "forecast", ok: ok, http_status: status,
       duration_ms: now_ms - started, records_count: count, error_message: error&.truncate(1000)
     )
+  end
+
+  # The check journal is a signal about the schedule, not part of the data
+  # collection: a failure to write it is worth a line in the log and nothing
+  # more — it must never turn a successful fetch into an error.
+  def record_check(outcome:, currency: nil, detail: nil)
+    RefreshCheck.create!(kind: "forecast", origin: @origin, currency: currency,
+                         outcome: outcome, detail: detail&.truncate(200))
+  rescue StandardError => e
+    Rails.logger.warn("RefreshCheck not written (#{outcome}): #{e.class}: #{e.message}")
   end
 
   def now_ms = Process.clock_gettime(Process::CLOCK_MONOTONIC, :millisecond)

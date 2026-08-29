@@ -6,7 +6,7 @@ namespace :forecasts do
       abort "forecasts:fetch: unknown currency #{args[:currency].inspect} (expected one of #{Rate::CURRENCIES.join(', ')})"
     end
 
-    ForecastsFetcher.fetch_all(currencies: currencies).each do |result|
+    ForecastsFetcher.fetch_all(currencies: currencies, origin: "task").each do |result|
       detail = case result[:status]
       when "ok"    then "#{result[:points]} points, #{result[:quote_rows]} quote rows"
       when "fresh" then "skipped, updated less than a day ago"
