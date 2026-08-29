@@ -24,6 +24,22 @@ module Providers
       private def get(_url) = [ "<html><body><p>Совсем другая разметка</p></body></html>", 200 ]
     end
 
+    # Builds a one-table page out of rows, so a test can state exactly which
+    # shape of markup it is about.
+    def page(rows)
+      body = rows.map { |cells| "<tr>" + cells.map { |c| "<td>#{c}</td>" }.join + "</tr>" }.join
+      "<html><body><table><tr><th>Месяц</th><th>Мин-Макс</th><th>Курс</th><th>Всего,%</th></tr>#{body}</table></body></html>"
+    end
+
+    # Serves markup handed to it — for the year-header shapes below.
+    class Shaped < Apecon
+      def self.key = "apecon"
+
+      def initialize(html) = @html = html
+
+      private def get(_url) = [ @html, 200 ]
+    end
+
     test "parses today's quote with the page's own date" do
       result = Stubbed.new.fetch(%w[USD])
 
@@ -70,6 +86,46 @@ module Providers
 
     test "unknown currency raises Providers::Error" do
       assert_raises(Providers::Error) { Stubbed.new.fetch_forecast("JPY") }
+    end
+
+    # apecon.ru writes its year headers as a single spanning cell today. If that
+    # cell is ever padded out to the table's width instead, the row is still a
+    # year header — only one cell of it carries anything.
+    test "a year header padded with empty cells still sets the year" do
+      html = page([ [ "2026", "", "", "" ],
+                    [ "Авг", "79.12-85.44", "81.18", "2.5%" ],
+                    [ "Сен", "78.49-89.40", "79.69", "0.6%" ] ])
+
+      points = Shaped.new(html).fetch_forecast("USD").points
+
+      assert_equal [ Date.new(2026, 8, 1), Date.new(2026, 9, 1) ], points.map { |p| p[:horizon_date] }
+      assert_equal BigDecimal("81.18"), points.first[:value]
+    end
+
+    # With no year headers at all the table's own order carries the year:
+    # months only ever run forward, so one that does not advance starts the
+    # next year. Without this the whole table used to parse into nothing.
+    test "with no year headers the rows are dated by their order" do
+      year = Date.current.year
+      html = page([ [ "Ноя", "80.23-83.88", "82.64", "4.3%" ],
+                    [ "Дек", "78.96-82.64", "80.16", "1.2%" ],
+                    [ "Янв", "76.59-80.16", "77.76", "-1.9%" ],
+                    [ "Фев", "77.76-81.29", "80.09", "1.1%" ] ])
+
+      points = Shaped.new(html).fetch_forecast("USD").points
+
+      assert_equal [ Date.new(year, 11, 1), Date.new(year, 12, 1),
+                     Date.new(year + 1, 1, 1), Date.new(year + 1, 2, 1) ],
+                   points.map { |p| p[:horizon_date] }
+    end
+
+    # "Not recognized" on its own cannot tell a redesign apart from a stub page
+    # served to our IP, so the message carries what the page actually was.
+    test "a parse failure reports the shape of the page it saw" do
+      error = assert_raises(Providers::Error) { Broken.new.fetch_forecast("USD") }
+
+      assert_match(/0 tables/, error.message)
+      assert_match(/0 month rows/, error.message)
     end
   end
 end
